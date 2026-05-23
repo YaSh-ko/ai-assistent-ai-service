@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Environmental variables
+.env
+.env.*
+
+# Logs
+logs/
+*.log
+
+# Vector DB
+chroma_db/
+chroma_db_poc/
+
+# IDE
+.vscode/
+.idea/
+.kiro/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pytest
+.pytest_cache/
+
+# Not sure
+.hypothesis/
+# Added by code-review-graph
+.code-review-graph/

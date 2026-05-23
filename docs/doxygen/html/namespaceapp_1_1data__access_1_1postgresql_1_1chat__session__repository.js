@@ -1,0 +1,4 @@
+var namespaceapp_1_1data__access_1_1postgresql_1_1chat__session__repository =
+[
+    [ "ChatSessionRepository", "classapp_1_1data__access_1_1postgresql_1_1chat__session__repository_1_1ChatSessionRepository.html", "classapp_1_1data__access_1_1postgresql_1_1chat__session__repository_1_1ChatSessionRepository" ]
+];

@@ -1,0 +1,30 @@
+{
+    "nodes": [
+        {
+            "id": "concept_rhizome",
+            "label": "Concept",
+            "properties": {
+                "name": "Ризома",
+                "description": "Неиерархическая сеть"
+            }
+        },
+        {
+            "id": "concept_becoming",
+            "label": "Concept",
+            "properties": {
+                "name": "Становление",
+                "description": "Процесс изменения"
+            }
+        }
+    ],
+    "relationships": [
+        {
+            "start_id": "concept_rhizome",
+            "end_id": "concept_becoming",
+            "type": "RELATES_TO",
+            "properties": {
+                "strength": 0.8
+            }
+        }
+    ]
+}

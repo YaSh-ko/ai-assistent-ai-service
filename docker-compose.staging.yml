@@ -1,0 +1,53 @@
+services:
+  # Бэкенд (FastAPI)
+  backend:
+    build: .
+    image: python-ai-service-staging:latest
+    container_name: staging_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=staging
+      # New Database Configuration (Server 2)
+      - POSTGRES_URL=${POSTGRES_URL}
+      - NEO4J_URI=${NEO4J_URI}
+      - NEO4J_USERNAME=${NEO4J_USERNAME}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - GIGACHAT_CREDENTIALS=${GIGACHAT_CREDENTIALS}
+    networks:
+      - philosophy_shared_network
+      - delez_monitoring  # join monitoring network so Prometheus can scrape /metrics
+    depends_on:
+      - staging_chroma
+
+  # Векторная база (Оставляем локально, если необходимо, или переносим на Server 2 - сейчас оставляем локально, так как миграция была только Postgres/Neo4j)
+  # UPDATE: В миграции мы перенесли базы. Chroma была в списке?
+  # В скрипте миграции (docker-compose.migration.yml) Chroma была указана как локальная (image: chromadb/chroma:latest).
+  # Значит оставляем её здесь.
+  staging_chroma:
+    image: chromadb/chroma:latest
+    container_name: staging_chroma
+    restart: unless-stopped
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    volumes:
+      - staging_chroma_data:/data
+    ports:
+      - "8001:8000"
+    networks:
+      - philosophy_shared_network
+
+volumes:
+  staging_chroma_data:
+
+
+networks:
+  philosophy_shared_network:
+    name: philosophy_shared_network
+  delez_monitoring:
+    external: true  # created by the monitoring repo's docker-compose
+    name: delez_monitoring

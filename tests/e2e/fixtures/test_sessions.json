@@ -1,0 +1,16 @@
+[
+    {
+        "user_id": "user_123",
+        "description": "Active session with history",
+        "messages": [
+            {
+                "role": "user",
+                "content": "Кто ты?"
+            },
+            {
+                "role": "assistant",
+                "content": "Я — твой философский собеседник."
+            }
+        ]
+    }
+]

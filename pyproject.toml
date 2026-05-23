@@ -1,0 +1,19 @@
+[tool.pytest.ini_options]
+pythonpath = "."
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = """
+    -v 
+    -m "not integration and not chrome"
+    --cov=app 
+    --cov-report=term-missing 
+    --cov-report=xml:coverage.xml
+    --cov-fail-under=60
+"""
+
+[tool.ruff]
+line-length = 88
+target-version = 'py312'
+select = ["E", "F", "B", "Q"]
+ignore = ["S101", "D", "ANN", "E501"]
+

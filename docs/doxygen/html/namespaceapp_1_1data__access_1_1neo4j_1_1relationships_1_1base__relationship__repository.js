@@ -1,0 +1,4 @@
+var namespaceapp_1_1data__access_1_1neo4j_1_1relationships_1_1base__relationship__repository =
+[
+    [ "BaseRelationshipRepository", "classapp_1_1data__access_1_1neo4j_1_1relationships_1_1base__relationship__repository_1_1BaseRelationshipRepository.html", "classapp_1_1data__access_1_1neo4j_1_1relationships_1_1base__relationship__repository_1_1BaseRelationshipRepository" ]
+];

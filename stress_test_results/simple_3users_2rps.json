@@ -1,0 +1,24 @@
+{
+  "config": {
+    "base_url": "http://localhost:8001",
+    "num_users": 3,
+    "duration_seconds": 60,
+    "rps_target": 2,
+    "test_type": "simple"
+  },
+  "summary": {
+    "duration": 60.56836271286011,
+    "total_requests": 243,
+    "successful_requests": 0,
+    "failed_requests": 243,
+    "error_rate": 100.0,
+    "throughput": 4.011995522348919,
+    "latency": {
+      "avg": 0.0,
+      "p50": 0.0,
+      "p95": 0.0,
+      "p99": 0.0
+    }
+  },
+  "timestamp": "2026-02-16T22:29:38.845548"
+}

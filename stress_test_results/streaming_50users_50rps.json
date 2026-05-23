@@ -1,0 +1,32 @@
+{
+  "config": {
+    "base_url": "http://localhost:8001",
+    "num_users": 50,
+    "duration_seconds": 30,
+    "rps_target": 50,
+    "test_type": "streaming"
+  },
+  "summary": {
+    "duration": 31.97426700592041,
+    "total_requests": 201,
+    "successful_requests": 201,
+    "failed_requests": 0,
+    "error_rate": 0.0,
+    "throughput": 6.286305170429161,
+    "latency": {
+      "avg": 7674.523879046464,
+      "p50": 6465.351343154907,
+      "p95": 12123.032093048096,
+      "p99": 12401.343584060669
+    },
+    "ttfb": {
+      "min": 166.6390895843506,
+      "max": 7235.865116119385,
+      "avg": 2174.079430043994,
+      "p50": 1685.3363513946533,
+      "p95": 5806.221961975098,
+      "p99": 6929.8095703125
+    }
+  },
+  "timestamp": "2026-02-13T15:38:14.630858"
+}

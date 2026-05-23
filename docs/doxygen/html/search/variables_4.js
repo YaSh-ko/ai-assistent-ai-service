@@ -1,0 +1,19 @@
+var searchData=
+[
+  ['dal_0',['dal',['../classapp_1_1chains_1_1cag__chain_1_1CAGChain.html#a6ab10b03bd63207c6371e0a805ca6421',1,'app.chains.cag_chain.CAGChain.dal'],['../classapp_1_1chains_1_1rag__chain_1_1RAGChain.html#abaf8ab71dbc430980a444361d61f7feb',1,'app.chains.rag_chain.RAGChain.dal']]],
+  ['data_5fsources_1',['data_sources',['../classapp_1_1models_1_1response_1_1SourceData.html#aa2faa68726e02dd20f2868506897de81',1,'app::models::response::SourceData']]],
+  ['database_2',['database',['../classapp_1_1data__access_1_1repositories_1_1base__repository_1_1BaseRepository.html#aa01954ad08caa38c75d785b6faa9dafd',1,'app::data_access::repositories::base_repository::BaseRepository']]],
+  ['database_5ftype_3',['DATABASE_TYPE',['../classapp_1_1core_1_1config_1_1Settings.html#a0bc027627708ad5b54d9c40be20c87c5',1,'app::core::config::Settings']]],
+  ['database_5furl_4',['DATABASE_URL',['../classapp_1_1core_1_1config_1_1Settings.html#a9b94c5c45b29a10ffa4901d121851fc3',1,'app::core::config::Settings']]],
+  ['date_5',['date',['../classapp_1_1models_1_1response_1_1RagEvent.html#a64e5afe219e3da7bc017405400936be0',1,'app::models::response::RagEvent']]],
+  ['date_5fformat_6',['DATE_FORMAT',['../namespacelogger.html#a827d7ef2fb17a09a3c55ffd357d3ad0e',1,'logger']]],
+  ['db_7',['db',['../classapp_1_1data__access_1_1neo4j_1_1graph__repository_1_1GraphRepository.html#a3002459dfd58ebfc7d50760f1b46067f',1,'app.data_access.neo4j.graph_repository.GraphRepository.db'],['../classapp_1_1data__access_1_1repositories_1_1base__repository_1_1BaseGraphRepository.html#a696576bf080ce902e9461317b8ae67eb',1,'app.data_access.repositories.base_repository.BaseGraphRepository.db']]],
+  ['db_5factive_5fconnections_8',['db_active_connections',['../namespacemetrics.html#adf02ae43a193f4db366474861b418de9',1,'metrics']]],
+  ['db_5ferrors_5ftotal_9',['db_errors_total',['../namespacemetrics.html#a3772ee15e932644877bb0db51dcd8853',1,'metrics']]],
+  ['db_5fprovider_10',['db_provider',['../classapp_1_1data__access_1_1postgresql_1_1base__repository_1_1BasePostgreSQLRepository.html#a6b74d87aa456d8601cffd677c9a5630f',1,'app.data_access.postgresql.base_repository.BasePostgreSQLRepository.db_provider'],['../classapp_1_1providers_1_1search_1_1bm25__provider_1_1BM25Provider.html#ad8e6065cab5e1c5debc60e13665222f6',1,'app.providers.search.bm25_provider.BM25Provider.db_provider']]],
+  ['db_5fquery_5fduration_5fseconds_11',['db_query_duration_seconds',['../namespacemetrics.html#a90469c67aaab747c1520b1e26ab7ed69',1,'metrics']]],
+  ['debug_12',['DEBUG',['../classapp_1_1core_1_1config_1_1Settings.html#a9d40926f722b8b6032f7ece39b1cc9ab',1,'app::core::config::Settings']]],
+  ['description_13',['description',['../classapp_1_1models_1_1response_1_1ReasoningStep.html#a741e8fb332659341689abaadc49369ff',1,'app.models.response.ReasoningStep.description'],['../classapp_1_1models_1_1response_1_1RagEvent.html#a5a9c2a03d1a43718c2175899be3ba84b',1,'app.models.response.RagEvent.description']]],
+  ['dotenv_5fpath_14',['DOTENV_PATH',['../namespaceapp_1_1core_1_1config.html#a2bee237336e93bdfeac3aa760cbcf841',1,'app::core::config']]],
+  ['driver_15',['driver',['../classapp_1_1providers_1_1databases_1_1neo4j__provider_1_1Neo4jProvider.html#a5973a5350331fdc0a633e0a10f77091b',1,'app::providers::databases::neo4j_provider::Neo4jProvider']]]
+];

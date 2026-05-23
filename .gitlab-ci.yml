@@ -1,0 +1,136 @@
+stages:
+  - lint
+  - test
+  - quality
+  - build
+  - deploy
+  - backup
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  DOCKER_IMAGE_NAME: "python-ai-service-staging"
+  GIT_SUBMODULE_STRATEGY: none
+
+cache:
+  paths:
+    - .cache/pip/
+    - venv/
+
+lint:
+  stage: lint
+  image: python:3.12-slim
+  before_script:
+    - apt-get update -qq && apt-get install -y git
+    - python -m venv venv
+    - . venv/bin/activate
+    - pip install --upgrade pip ruff
+  script:
+    - python -m ruff check --fix app/ scripts/ tests/ || true
+    - python -m ruff check app/ scripts/ tests/ || true
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  
+
+
+test:
+  stage: test
+  image: python:3.12-slim
+
+  services:
+    - postgres:15-alpine
+  variables:
+    POSTGRES_DB: test
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    POSTGRES_HOST_AUTH_METHOD: trust
+    POSTGRES_HOST: postgres
+
+  before_script:
+    - apt-get update -qq && apt-get install -y git postgresql-client
+    - python -m venv venv
+    - . venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -r requirements.txt pytest pytest-cov pytest-asyncio httpx
+  script:
+    - pytest tests/ -m "not integration and not chrome" --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing -v || true
+    - ls -la coverage.xml || false
+  artifacts:
+    paths: [coverage.xml]
+    expire_in: 1 week
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}-venv"
+    paths: [venv/, .pytest_cache/]
+  timeout: 10m
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+
+
+sonarqube-check:
+  stage: quality
+  needs: [test]
+  image:
+    name: sonarsource/sonar-scanner-cli:latest
+    entrypoint: [""]
+  variables:
+    SONAR_HOST_URL: "https://sonar.delez-repo.ru"
+  before_script: []
+  script:
+    - sonar-scanner -Dsonar.host.url=https://sonar.delez-repo.ru -Dsonar.projectKey=root_python-ai-service_ae959733-5c9d-4133-ae3e-740f4b07407e
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+build:
+  stage: build
+  image: docker:24.0-dind
+  services:
+    - docker:24.0-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  script:
+    - docker build -t $DOCKER_IMAGE_NAME:latest .
+
+
+deploy_staging:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client git
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $SSH_HOST >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+  script:
+    - |
+      ssh $SSH_USER@$SSH_HOST << 'ENDSSH'
+        set -e
+        echo "Deploying Python AI Service..."
+        cd ~/PRACTICE/python-ai-service
+        
+        # Убеждаемся, что git не ругается на владельца
+        git config --global --add safe.directory $(pwd) || true
+        
+        git pull origin main
+        docker-compose -f docker-compose.staging.yml up -d --build
+        echo "Backend deployed successfully!"
+      ENDSSH
+  environment:
+    name: staging
+    url: http://155.212.145.190:8000
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+backup:
+  stage: backup
+  image: docker:latest
+  script:
+    - apk add postgresql-client
+    - PGPASSWORD=$POSTGRES_PASSWORD pg_dump -h 85.198.103.254 -U Admin_delezDB_psql philosophy_staging > app_db_backup.sql
+  artifacts:
+    paths: [app_db_backup.sql]
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

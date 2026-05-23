@@ -1,0 +1,28 @@
+var searchData=
+[
+  ['save_5fto_5fdb_0',['save_to_db',['../classapp_1_1chains_1_1rag__chain_1_1RAGChain.html#ac9da00ba9dd9b3971a1306638b621b4e',1,'app::chains::rag_chain::RAGChain']]],
+  ['search_5fconfig_1',['SEARCH_CONFIG',['../classapp_1_1core_1_1config_1_1Settings.html#a546d4cf4bc56d7db425964026e108e53',1,'app::core::config::Settings']]],
+  ['search_5fprovider_2',['search_provider',['../classapp_1_1chains_1_1cag__chain_1_1CAGChain.html#a41501667f493ef3cfb91b41633d451bc',1,'app::chains::cag_chain::CAGChain']]],
+  ['search_5fresults_3',['search_results',['../classapp_1_1chains_1_1cag__chain_1_1CAGState.html#a2725a9df84c70a3c889ab8cb3de02182',1,'app.chains.cag_chain.CAGState.search_results'],['../classapp_1_1chains_1_1rag__chain_1_1RAGState.html#a11565cbc4f6a10dae89602dbd58e8dcf',1,'app.chains.rag_chain.RAGState.search_results']]],
+  ['search_5ftop_5fk_4',['search_top_k',['../classapp_1_1chains_1_1rag__chain_1_1RAGChain.html#a9e7e42ddbd61a20c57c013488764bacf',1,'app::chains::rag_chain::RAGChain']]],
+  ['session_5fconfig_5',['SESSION_CONFIG',['../classapp_1_1core_1_1config_1_1Settings.html#afa2ad49e3e721de7673500d470f804cd',1,'app::core::config::Settings']]],
+  ['session_5fduration_5fms_6',['session_duration_ms',['../classapp_1_1models_1_1response_1_1ResponseMetadata.html#a8946f4f8a443e45f542883c549e877d3',1,'app::models::response::ResponseMetadata']]],
+  ['session_5frepo_7',['session_repo',['../classapp_1_1data__access_1_1repositories_1_1dal_1_1DataAccessLayer.html#a3c82c35503da896ac4e6721f9e0c23ec',1,'app.data_access.repositories.dal.DataAccessLayer.session_repo'],['../classapp_1_1services_1_1session__service_1_1SessionService.html#a2454f10e732e370622487dc49e7af0f2',1,'app.services.session_service.SessionService.session_repo']]],
+  ['settings_8',['settings',['../namespaceapp_1_1core_1_1config.html#aaf1ab88307b8c95686aa2580c02f46a9',1,'app::core::config']]],
+  ['simple_9',['SIMPLE',['../classapp_1_1models_1_1complexity__models_1_1ComplexityLevel.html#a7a187e8bbc2299099e56391f04f931ac',1,'app::models::complexity_models::ComplexityLevel']]],
+  ['simple_5fmax_5flength_10',['SIMPLE_MAX_LENGTH',['../classapp_1_1core_1_1complexity__classifier_1_1ComplexityClassifier.html#af2159f71340ae8b90790976d9d74d970',1,'app::core::complexity_classifier::ComplexityClassifier']]],
+  ['simple_5fpatterns_11',['SIMPLE_PATTERNS',['../classapp_1_1core_1_1complexity__classifier_1_1ComplexityClassifier.html#addb69bf118cdd42b8e122cdf784bcd1b',1,'app::core::complexity_classifier::ComplexityClassifier']]],
+  ['sources_12',['sources',['../classapp_1_1models_1_1response_1_1ReasoningStep.html#ad28c1f4a34f05b3510ee5fd7f34ac718',1,'app.models.response.ReasoningStep.sources'],['../classapp_1_1models_1_1response_1_1ChatResponse.html#a752028549970f68ebaaeca0620aff92e',1,'app.models.response.ChatResponse.sources']]],
+  ['states_13',['states',['../classapp_1_1models_1_1chat__session_1_1ChatSession.html#a2a459bd09556f665f30ae4aba0f68e58',1,'app::models::chat_session::ChatSession']]],
+  ['status_14',['status',['../classapp_1_1api_1_1threads_1_1ThreadSearchRequest.html#ab87d8cf8dc5a9f135ef6b952c132d52d',1,'app.api.threads.ThreadSearchRequest.status'],['../classapp_1_1models_1_1chat__session_1_1ChatSession.html#aface5d03bdf3bd2b52ad454d7a291651',1,'app.models.chat_session.ChatSession.status'],['../classapp_1_1models_1_1thread_1_1Thread.html#ab0b050301e70f4857d7c61dcee867d42',1,'app.models.thread.Thread.status']]],
+  ['step_5fdurations_15',['step_durations',['../classmetrics_1_1ReasoningStats.html#a0ed732008d5d0a8d97ae28d799cc19f3',1,'metrics::ReasoningStats']]],
+  ['steps_16',['steps',['../classapp_1_1models_1_1response_1_1ReasoningData.html#a61203e8b03649131a0e7d76d684e0c3a',1,'app.models.response.ReasoningData.steps'],['../classapp_1_1reasoning_1_1types_1_1CoTState.html#ac0dfa2c3a3e24ffc22349e7b2897fb04',1,'app.reasoning.types.CoTState.steps'],['../classapp_1_1reasoning_1_1types_1_1ReasoningResult.html#a220cc6c2dd1eef7c0d146626627e4d09',1,'app.reasoning.types.ReasoningResult.steps']]],
+  ['stream_5fmode_17',['stream_mode',['../classapp_1_1api_1_1runs_1_1RunStreamRequest.html#aea41b8fd35815c961d9d62399c930ca2',1,'app::api::runs::RunStreamRequest']]],
+  ['stream_5fsubgraphs_18',['stream_subgraphs',['../classapp_1_1api_1_1runs_1_1RunStreamRequest.html#ad388c72c3ce0df6363c609beb303f2f4',1,'app::api::runs::RunStreamRequest']]],
+  ['streaming_19',['streaming',['../classapp_1_1models_1_1response_1_1ResponseMetadata.html#a0629df01bdd02e5c76e3532636f04420',1,'app::models::response::ResponseMetadata']]],
+  ['successful_5fexecutions_20',['successful_executions',['../classmetrics_1_1ReasoningStats.html#afa82643b539a5ba70f12b6e847ad58f2',1,'metrics::ReasoningStats']]],
+  ['successful_5frequests_21',['successful_requests',['../classmetrics_1_1ModelStats.html#af476e75c61d94b777cddb679701d1adb',1,'metrics::ModelStats']]],
+  ['suggested_5fmodel_22',['suggested_model',['../classapp_1_1models_1_1complexity__models_1_1ComplexityResult.html#a304e867e643f7905a5af5ca919087fdb',1,'app::models::complexity_models::ComplexityResult']]],
+  ['summary_23',['summary',['../classapp_1_1models_1_1response_1_1RagEvent.html#a7f674ea1e7584a9c6e49f0e412b3d586',1,'app::models::response::RagEvent']]],
+  ['system_5fprompt_24',['system_prompt',['../classapp_1_1chains_1_1cag__chain_1_1CAGChain.html#a6c08b7c914a889df5b3ef7578bd995a0',1,'app.chains.cag_chain.CAGChain.system_prompt'],['../classapp_1_1chains_1_1rag__chain_1_1RAGChain.html#ac6a5094a125637b7bffbee2cf993f284',1,'app.chains.rag_chain.RAGChain.system_prompt']]]
+];

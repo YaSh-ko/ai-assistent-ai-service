@@ -1,0 +1,4 @@
+var namespaceapp_1_1providers_1_1reasoning_1_1mcp__thinking__provider =
+[
+    [ "MCPThinkingProvider", "classapp_1_1providers_1_1reasoning_1_1mcp__thinking__provider_1_1MCPThinkingProvider.html", "classapp_1_1providers_1_1reasoning_1_1mcp__thinking__provider_1_1MCPThinkingProvider" ]
+];

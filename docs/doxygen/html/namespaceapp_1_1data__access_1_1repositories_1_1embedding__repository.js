@@ -1,0 +1,4 @@
+var namespaceapp_1_1data__access_1_1repositories_1_1embedding__repository =
+[
+    [ "EmbeddingRepository", "classapp_1_1data__access_1_1repositories_1_1embedding__repository_1_1EmbeddingRepository.html", "classapp_1_1data__access_1_1repositories_1_1embedding__repository_1_1EmbeddingRepository" ]
+];

@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: delez_local_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=db_for_delez
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=kNn97ScJBma7cBtK
+    ports:
+      - "5433:5432"
+    volumes:
+      - delez_local_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: delez_local_neo4j
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=neo4j/password123
+      - NEO4J_PLUGINS=["apoc"]
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - delez_local_neo4j_data:/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: delez_local_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: delez_local_chroma
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    volumes:
+      - delez_local_chroma_data:/chroma/data
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: delez_local_ai
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.local
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:kNn97ScJBma7cBtK@db:5432/db_for_delez
+      - CHROMA_SERVER_HOST=chroma
+      - CHROMA_SERVER_PORT=8000
+      - CHROMA_SERVER_SSL=False
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - NEO4J_URI=bolt://neo4j:7687
+      - REDIS_HOST=redis
+      - REDIS_URL=redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./common:/app/common
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  delez_local_postgres_data:
+  delez_local_neo4j_data:
+  delez_local_chroma_data:

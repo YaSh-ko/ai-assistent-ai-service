@@ -1,0 +1,24 @@
+var searchData=
+[
+  ['t_0',['T',['../namespaceapp_1_1data__access_1_1repositories_1_1base__repository.html#a6d6e134c03eff02ef7460bf6a32a2f61',1,'app::data_access::repositories::base_repository']]],
+  ['task_5fmodel_5fmap_1',['TASK_MODEL_MAP',['../classapp_1_1core_1_1config_1_1Settings.html#aa511388e30543d8c43f2a515cde5fce0',1,'app::core::config::Settings']]],
+  ['temperature_2',['temperature',['../classapp_1_1api_1_1models_1_1ConfigUpdateRequest.html#aa484878c6efbe9b46181b9b36250f93e',1,'app.api.models.ConfigUpdateRequest.temperature'],['../classapp_1_1interfaces_1_1model__provider_1_1ModelConfig.html#afe55c28370312a3635330cb9fe73719f',1,'app.interfaces.model_provider.ModelConfig.temperature']]],
+  ['thought_3',['thought',['../classapp_1_1models_1_1response_1_1ReasoningStep.html#a8f2818bba8d7e89d86f4974b92b48a62',1,'app::models::response::ReasoningStep']]],
+  ['thread_5fid_4',['thread_id',['../classapp_1_1api_1_1threads_1_1ThreadCreateRequest.html#ac374f141e864c376a653ae7c04fdac4d',1,'app.api.threads.ThreadCreateRequest.thread_id'],['../classapp_1_1models_1_1chat__session_1_1ChatSession.html#a20e759599373a4aba756422442e8fdef',1,'app.models.chat_session.ChatSession.thread_id'],['../classapp_1_1models_1_1complexity__models_1_1QueryContext.html#a28583e8ccf9244f29452aa559959bbd7',1,'app.models.complexity_models.QueryContext.thread_id']]],
+  ['thread_5fnot_5ffound_5',['THREAD_NOT_FOUND',['../namespaceapp_1_1api_1_1threads.html#a9e28276e329883d4971cdeb10b30db71',1,'app::api::threads']]],
+  ['time_5fms_6',['time_ms',['../classapp_1_1models_1_1response_1_1ReasoningStep.html#afe73ba9ff7e626cb7ea84ff51d54f937',1,'app::models::response::ReasoningStep']]],
+  ['timeout_7',['timeout',['../classapp_1_1interfaces_1_1model__provider_1_1ModelConfig.html#a94baebef3f5c5033a9ed2f551f14c766',1,'app::interfaces::model_provider::ModelConfig']]],
+  ['timeout_5fper_5fstep_8',['timeout_per_step',['../classapp_1_1reasoning_1_1cot__reasoning_1_1CoTReasoning.html#aa66edfe3a988859fd40a868c178fd0c0',1,'app::reasoning::cot_reasoning::CoTReasoning']]],
+  ['timestamp_9',['timestamp',['../classapp_1_1models_1_1message_1_1Message.html#a0da935a5fec6bb6fa61087080134418b',1,'app.models.message.Message.timestamp'],['../classapp_1_1models_1_1response_1_1ChatResponse.html#af592cad211eb946e19b1c3d79d3a92d4',1,'app.models.response.ChatResponse.timestamp']]],
+  ['title_10',['title',['../classapp_1_1models_1_1response_1_1RagEvent.html#a620c7babb94ee42f4ee8806af33172c7',1,'app::models::response::RagEvent']]],
+  ['tokens_11',['tokens',['../classapp_1_1models_1_1response_1_1ResponseMetadata.html#a8e02ad6398a2243699c5a9b719430bcb',1,'app::models::response::ResponseMetadata']]],
+  ['tokens_5fused_12',['tokens_used',['../classapp_1_1interfaces_1_1model__provider_1_1ModelResponse.html#a14ca7320472844c079f04e4279005d4d',1,'app::interfaces::model_provider::ModelResponse']]],
+  ['top_5fp_13',['top_p',['../classapp_1_1api_1_1models_1_1ConfigUpdateRequest.html#a5efb1d429f5a85067a123c8516e68d47',1,'app.api.models.ConfigUpdateRequest.top_p'],['../classapp_1_1interfaces_1_1model__provider_1_1ModelConfig.html#ad94d43af6f21c237c28feca09a98bfb0',1,'app.interfaces.model_provider.ModelConfig.top_p']]],
+  ['total_5fduration_5fms_14',['total_duration_ms',['../classmetrics_1_1ReasoningStats.html#a31b8fb41c09bf0e0bb6ac6539d2f83b6',1,'metrics::ReasoningStats']]],
+  ['total_5fexecutions_15',['total_executions',['../classmetrics_1_1ReasoningStats.html#a01ec9deb022f9f4f5adf49a84c7c841a',1,'metrics::ReasoningStats']]],
+  ['total_5flatency_5fms_16',['total_latency_ms',['../classmetrics_1_1ModelStats.html#a824f44b538a9856608123b5df3de587c',1,'metrics::ModelStats']]],
+  ['total_5frequests_17',['total_requests',['../classmetrics_1_1ModelStats.html#a2afa1fa8fce777841c652fa4fb4ff1cf',1,'metrics::ModelStats']]],
+  ['total_5ftime_5fms_18',['total_time_ms',['../classapp_1_1models_1_1response_1_1ReasoningData.html#a1f5118954d0ed0e26a8253d4803d6493',1,'app::models::response::ReasoningData']]],
+  ['total_5ftokens_19',['total_tokens',['../classmetrics_1_1ModelStats.html#a6f821cae3eb39844f043ab1e77a08964',1,'metrics::ModelStats']]],
+  ['type_20',['type',['../classapp_1_1models_1_1response_1_1ReasoningData.html#a67f987d8761dde39d655a36cc912cae6',1,'app::models::response::ReasoningData']]]
+];
