@@ -4,6 +4,7 @@ import asyncio
 from app.factory.database_factory import DatabaseFactory
 from app.data_access.postgresql.chat_session_repository import ChatSessionRepository
 from app.services.session_manager import SessionManager
+from app.services.detector_service import DetectorService
 from app.providers.databases.postgres_provider import PostgresProvider
 from app.chains.rag_chain import RAGChain
 from app.services.embedding_service import EmbeddingService
@@ -28,6 +29,7 @@ _pii_service = None
 _session_manager = None
 _rag_chain = None
 _dal = None
+_detector_service = None
 
 # Initialization locks
 _llm_lock = asyncio.Lock()
@@ -36,6 +38,7 @@ _pii_lock = asyncio.Lock()
 _session_manager_lock = asyncio.Lock()
 _rag_chain_lock = asyncio.Lock()
 _dal_lock = asyncio.Lock()
+_detector_service_lock = asyncio.Lock()
 
 async def get_llm_service() -> LLMService:
     global _llm_service
@@ -99,6 +102,16 @@ async def get_session_manager() -> SessionManager:
                 logger.error("SessionManager requires PostgresProvider")
                 raise RuntimeError("SessionManager requires PostgresProvider")
     return _session_manager
+
+async def get_detector_service() -> DetectorService:
+    """Dependency to get DetectorService singleton."""
+    global _detector_service
+    async with _detector_service_lock:
+        if _detector_service is None:
+            session_manager = await get_session_manager()
+            _detector_service = DetectorService(session_manager)
+    return _detector_service
+
 
 async def get_rag_chain() -> RAGChain:
     """Dependency to get RAGChain singleton with full integration."""

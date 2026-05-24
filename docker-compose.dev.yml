@@ -1,0 +1,94 @@
+# Локальный стек: Postgres + Neo4j + Redis + Chroma + AI-service.
+# Запуск: docker compose --env-file .env.local -f docker-compose.dev.yml up -d
+# См. LOCAL_DEVELOPMENT.md
+# Секреты — в .env.local (не коммитить). Для подстановки ${POSTGRES_PASSWORD} нужен --env-file.
+# Секция environment у ai-service — имена хостов ВНУТРИ docker-сети (db, neo4j, …),
+# они перекрывают localhost из .env.local.
+
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: delez_local_db
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-db_for_delez}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.local}
+    ports:
+      - "5433:5432"
+    volumes:
+      - delez_local_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: delez_local_neo4j
+    restart: unless-stopped
+    # Не подключать .env.local: NEO4J_URI там ломает старт (Neo4j читает как setting "URI")
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env.local}
+      NEO4J_PLUGINS: '["apoc"]'
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - delez_local_neo4j_data:/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: delez_local_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: delez_local_chroma
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    volumes:
+      - delez_local_chroma_data:/chroma/data
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: delez_local_ai
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.local
+    environment:
+      # Внутри compose — сервисные имена, не localhost / не прод
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-db_for_delez}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USERNAME: neo4j
+      CHROMA_SERVER_HOST: chroma
+      CHROMA_SERVER_PORT: "8000"
+      CHROMA_SERVER_SSL: "False"
+      REDIS_HOST: redis
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./common:/app/common
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  delez_local_postgres_data:
+  delez_local_neo4j_data:
+  delez_local_chroma_data:

@@ -27,7 +27,7 @@ def get_gigachat_ssl_context() -> ssl.SSLContext:
     Prioritizes system trust store where Russian CA certificates are installed.
     """
     context = ssl.create_default_context()
-    
+
     ca_bundle = get_ca_bundle_path()
     if ca_bundle:
         try:
@@ -35,11 +35,11 @@ def get_gigachat_ssl_context() -> ssl.SSLContext:
             logger.debug(f"Loaded CA bundle from {ca_bundle}")
         except Exception as e:
             logger.warning(f"Failed to load CA bundle from {ca_bundle}: {e}")
-            
+
     # Emergency bypass via env var
     if os.getenv("GIGACHAT_VERIFY_SSL", "true").lower() == "false":
         logger.warning("GIGACHAT_VERIFY_SSL is set to FALSE. SSL verification is DISABLED!")
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
-        
+
     return context

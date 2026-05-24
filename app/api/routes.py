@@ -9,6 +9,7 @@ from app.api.runs import router as runs_router
 from app.api.models import router as models_router
 from app.api.v1.chat_controller import router as v1_chat_router
 from app.api.hints import router as hints_router
+from app.api.v1.detector_controller import router as detector_router
 
 api_router = APIRouter()
 
@@ -19,6 +20,7 @@ api_router.include_router(runs_router)
 api_router.include_router(models_router)
 api_router.include_router(v1_chat_router)
 api_router.include_router(hints_router)
+api_router.include_router(detector_router)
 
 
 @api_router.get("/info", tags=["system"])

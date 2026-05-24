@@ -179,6 +179,8 @@ class GigaChatProvider(BaseModelProvider):
             "RqUID": str(uuid.uuid4())
         }
 
+        logger.error(f"GigaChat auth headers: {headers}")
+
         try:
             async with session.post(self.AUTH_URL, headers=headers, data={"scope": self._scope}) as response:
                 if response.status != 200:

@@ -16,7 +16,8 @@ import uuid
 import logging
 
 from app.models.run import Run
-from app.api.deps import get_rag_chain, get_session_manager
+from app.api.deps import get_detector_service, get_rag_chain, get_session_manager
+from app.services.detector_service import DetectorService
 from app.services.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
@@ -182,6 +183,7 @@ async def _stream_and_save_response(
     is_regeneration: bool,
     rag_chain: Any,
     session_manager: SessionManager,
+    detector_service: DetectorService,
     is_first_message: bool = False,
 ):
     """Internal generator to stream RAGChain output and save state."""
@@ -228,11 +230,35 @@ async def _stream_and_save_response(
         if not full_response:
             full_response = "Извините, не удалось сгенерировать ответ."
 
+        final_messages = full_messages_history + [
+            {"type": "ai", "id": ai_message_id, "content": full_response}
+        ]
         await session_manager.save_thread_state(
             thread_id, run_id, assistant_id,
-            full_messages_history + [{"type": "ai", "id": ai_message_id, "content": full_response}],
-            parent_checkpoint_id=pre_ai_checkpoint_id
+            final_messages,
+            parent_checkpoint_id=pre_ai_checkpoint_id,
         )
+
+        # Detector → LangGraph SDK reads only event: "custom"
+        try:
+            proposal = await detector_service.run_after_turn(thread_id, final_messages)
+            if proposal and proposal.show_chip:
+                yield _format_sse(
+                    "custom",
+                    {
+                        "type": "detector_proposal",
+                        "proposal": proposal.model_dump(),
+                    },
+                )
+                logger.info(
+                    "Detector SSE (custom) thread=%s type=%s",
+                    thread_id,
+                    proposal.entity_type,
+                )
+        except Exception as det_err:
+            logger.warning(
+                "Detector failed for thread %s: %s", thread_id, det_err, exc_info=True
+            )
     except Exception as e:
         logger.error(f"Error in _stream_and_save_response: {e}", exc_info=True)
         yield _format_sse("error", {"message": str(e), "name": "StreamError"})
@@ -244,6 +270,7 @@ async def stream_run_create(
     request: RunStreamRequest,
     rag_chain: Annotated[Any, Depends(get_rag_chain)],
     session_manager: Annotated[SessionManager, Depends(get_session_manager)],
+    detector_service: Annotated[DetectorService, Depends(get_detector_service)],
     x_user_id: Optional[str] = Header(None, alias="X-User-Id"),
 ):
     """
@@ -287,7 +314,7 @@ async def stream_run_create(
         _stream_and_save_response(
             thread_id, run_id, request.assistant_id, user_message, user_id,
             full_messages_history, checkpoint_id, is_regeneration,
-            rag_chain, session_manager,
+            rag_chain, session_manager, detector_service,
             is_first_message=is_first_message,
         ),
         media_type="text/event-stream",

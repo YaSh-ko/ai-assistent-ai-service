@@ -1,6 +1,9 @@
+# Локально: только БД (Postgres, Neo4j, Chroma). AI/API — в IDE на хосте.
+# Запуск: docker compose --env-file .env.local up -d
+# Полный стек с ai-service: docker-compose.dev.yml
+
 services:
-  postgres:
-    image: postgres:15-alpine
+  postgres:    image: postgres:15-alpine
     container_name: delez_ai_postgres
     restart: unless-stopped
     ports:
