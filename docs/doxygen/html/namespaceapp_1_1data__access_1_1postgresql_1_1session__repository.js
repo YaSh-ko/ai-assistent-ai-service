@@ -1,4 +1,0 @@
-var namespaceapp_1_1data__access_1_1postgresql_1_1session__repository =
-[
-    [ "SessionRepository", "classapp_1_1data__access_1_1postgresql_1_1session__repository_1_1SessionRepository.html", "classapp_1_1data__access_1_1postgresql_1_1session__repository_1_1SessionRepository" ]
-];

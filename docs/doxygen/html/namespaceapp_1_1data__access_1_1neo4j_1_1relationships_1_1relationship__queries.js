@@ -1,4 +1,0 @@
-var namespaceapp_1_1data__access_1_1neo4j_1_1relationships_1_1relationship__queries =
-[
-    [ "RelationshipQueryRepository", "classapp_1_1data__access_1_1neo4j_1_1relationships_1_1relationship__queries_1_1RelationshipQueryRepository.html", "classapp_1_1data__access_1_1neo4j_1_1relationships_1_1relationship__queries_1_1RelationshipQueryRepository" ]
-];

@@ -1,4 +1,0 @@
-var namespaceapp_1_1data__access_1_1postgresql_1_1entry__thread__repository =
-[
-    [ "EntryThreadRepository", "classapp_1_1data__access_1_1postgresql_1_1entry__thread__repository_1_1EntryThreadRepository.html", "classapp_1_1data__access_1_1postgresql_1_1entry__thread__repository_1_1EntryThreadRepository" ]
-];

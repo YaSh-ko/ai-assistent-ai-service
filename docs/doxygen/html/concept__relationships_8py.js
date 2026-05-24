@@ -1,4 +1,0 @@
-var concept__relationships_8py =
-[
-    [ "app.data_access.neo4j.relationships.concept_relationships.ConceptRelationshipRepository", "classapp_1_1data__access_1_1neo4j_1_1relationships_1_1concept__relationships_1_1ConceptRelationshipRepository.html", "classapp_1_1data__access_1_1neo4j_1_1relationships_1_1concept__relationships_1_1ConceptRelationshipRepository" ]
-];

@@ -1,4 +1,0 @@
-var analysis__thread__repository_8py =
-[
-    [ "app.data_access.postgresql.analysis_thread_repository.AnalysisThreadRepository", "classapp_1_1data__access_1_1postgresql_1_1analysis__thread__repository_1_1AnalysisThreadRepository.html", "classapp_1_1data__access_1_1postgresql_1_1analysis__thread__repository_1_1AnalysisThreadRepository" ]
-];

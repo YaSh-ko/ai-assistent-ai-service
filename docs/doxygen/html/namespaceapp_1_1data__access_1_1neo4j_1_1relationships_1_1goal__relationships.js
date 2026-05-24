@@ -1,4 +1,0 @@
-var namespaceapp_1_1data__access_1_1neo4j_1_1relationships_1_1goal__relationships =
-[
-    [ "GoalRelationshipRepository", "classapp_1_1data__access_1_1neo4j_1_1relationships_1_1goal__relationships_1_1GoalRelationshipRepository.html", "classapp_1_1data__access_1_1neo4j_1_1relationships_1_1goal__relationships_1_1GoalRelationshipRepository" ]
-];

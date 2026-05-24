@@ -107,10 +107,11 @@ class TestRouterIntegration:
         # Verify models router is included
         assert models_router is not None
     
-    def test_router_includes_v1_chat(self):
-        """Test that v1 chat router is included"""
+    def test_router_includes_detector(self):
+        """Test that detector router is included"""
         from app.api.routes import api_router
-        from app.api.v1.chat_controller import router as v1_chat_router
-        
-        # Verify v1 chat router is included
-        assert v1_chat_router is not None
+        from app.api.v1.detector_controller import router as detector_router
+
+        assert detector_router is not None
+        route_paths = [getattr(r, "path", "") for r in api_router.routes]
+        assert any("detector" in p for p in route_paths)

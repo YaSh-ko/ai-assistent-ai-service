@@ -1,4 +1,0 @@
-var goal__relationships_8py =
-[
-    [ "app.data_access.neo4j.relationships.goal_relationships.GoalRelationshipRepository", "classapp_1_1data__access_1_1neo4j_1_1relationships_1_1goal__relationships_1_1GoalRelationshipRepository.html", "classapp_1_1data__access_1_1neo4j_1_1relationships_1_1goal__relationships_1_1GoalRelationshipRepository" ]
-];

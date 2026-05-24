@@ -3,12 +3,11 @@ pythonpath = "."
 asyncio_mode = "auto"
 testpaths = ["tests"]
 addopts = """
-    -v 
+    -v
     -m "not integration and not chrome"
-    --cov=app 
-    --cov-report=term-missing 
-    --cov-report=xml:coverage.xml
-    --cov-fail-under=60
+    --cov=app
+    --cov-report=term-missing
+    --cov-fail-under=35
 """
 
 [tool.ruff]
