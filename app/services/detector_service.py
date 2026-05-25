@@ -12,6 +12,7 @@ from app.models.detector import (
 )
 from app.services.detector_agent import DetectorAgent
 from app.services.detector_session_service import DetectorSessionService
+from app.services.entity_index_service import EntityIndexService
 from app.services.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
@@ -118,23 +119,24 @@ def guess_focus_type_from_messages(messages: List[Dict[str, Any]]) -> Optional[s
     if not last_user:
         return None
 
-    event_markers = (
-        "вчера", "сегодня", "случил", "произош", "было", "сорвал",
-        "конфликт", "встреч", "разговор", "на работе", "событ",
+    observation_markers = (
+        "заметил", "понял", "осознал", "увидел", "вчера", "сегодня",
+        "случил", "произош", "было", "на работе", "обратил внимание",
+        "чувствую", "наблюдение", "столкнулся",
     )
     goal_markers = (
         "хочу", "цель", "планиру", "достич", "добиться", "мечтаю",
-        "намерен", "стремлюсь", "к лету", "к июн", "похуд",
+        "намерен", "стремлюсь", "к лету", "к июн", "направлен",
     )
-    experiment_markers = (
-        "попробую", "эксперимент", "гипотез", "проверю", "тестиру",
-        "посмотрю что будет", "в течение недели буду",
+    task_markers = (
+        "попробую", "сделаю", "нужно", "задача", "записаться",
+        "шаг", "начну", "в течение недели", "на этой неделе",
     )
 
     scores = {
-        "event": sum(1 for m in event_markers if m in last_user),
+        "observation": sum(1 for m in observation_markers if m in last_user),
         "goal": sum(1 for m in goal_markers if m in last_user),
-        "experiment": sum(1 for m in experiment_markers if m in last_user),
+        "task": sum(1 for m in task_markers if m in last_user),
     }
     best_type, best_score = max(scores.items(), key=lambda x: x[1])
     return best_type if best_score > 0 else None
@@ -159,10 +161,12 @@ class DetectorService:
         session_manager: SessionManager,
         detector_agent: Optional[DetectorAgent] = None,
         session_logic: Optional[DetectorSessionService] = None,
+        entity_index: Optional[EntityIndexService] = None,
     ):
         self._sessions = session_manager
         self._agent = detector_agent or DetectorAgent()
         self._logic = session_logic or DetectorSessionService()
+        self._entity_index = entity_index
 
     async def run_after_turn(
         self,
@@ -172,6 +176,10 @@ class DetectorService:
         """
         Run detector after an assistant turn; persist state; return chip proposal if ready.
         """
+        logger.info(
+            "[DetectorService] ========== DETECTOR RUN START ========== thread=%s total_msgs=%d",
+            thread_id, len(messages),
+        )
         session = await self._sessions.get_session(thread_id)
         if not session:
             logger.warning("[DetectorService] No session for thread %s", thread_id)
@@ -179,6 +187,7 @@ class DetectorService:
 
         detector_messages = langgraph_messages_to_detector_format(messages)
         if not detector_messages:
+            logger.info("[DetectorService] No detector messages after conversion, skipping")
             return None
 
         last_user_text = ""
@@ -187,7 +196,13 @@ class DetectorService:
                 last_user_text = msg.get("content", "")
                 break
 
+        logger.info(
+            "[DetectorService] User message: %r (%d chars)",
+            last_user_text[:100], len(last_user_text),
+        )
+
         focus_messages = trim_messages_to_last_turn(detector_messages)
+        logger.info("[DetectorService] Focus messages: %d (trimmed from %d)", len(focus_messages), len(detector_messages))
 
         state = load_session_state(session.context or {})
         context = build_detector_context(session.context or {}, state)
@@ -197,11 +212,40 @@ class DetectorService:
 
         preferred_type = guess_focus_type_from_messages(focus_messages)
 
+        existing_entities = None
+        if self._entity_index and last_user_text:
+            user_id = getattr(session, "user_id", None)
+            logger.info(
+                "[DetectorService] Entity search: user_id=%s query=%r entity_index=%s",
+                user_id, last_user_text[:60], "available" if self._entity_index else "none",
+            )
+            if user_id:
+                try:
+                    matches = await self._entity_index.search(user_id, last_user_text)
+                    if matches:
+                        existing_entities = [m.to_dict() for m in matches]
+                        logger.info(
+                            "[DetectorService] Passing %d existing entities to LLM prompt:",
+                            len(matches),
+                        )
+                        for m in matches:
+                            logger.info(
+                                "[DetectorService]   [%s] id=%s «%s» score=%.3f",
+                                m.entity_type, m.entity_id[:12], m.title[:50], m.score,
+                            )
+                    else:
+                        logger.info("[DetectorService] No similar existing entities found")
+                except Exception as e:
+                    logger.warning("[DetectorService] Entity search failed: %s", e, exc_info=True)
+        elif not self._entity_index:
+            logger.debug("[DetectorService] Entity index not configured, skipping search")
+
         try:
             detection = await self._agent.detect(
                 thread_id=thread_id,
                 messages=focus_messages,
                 context=context,
+                existing_entities=existing_entities,
             )
         except Exception as e:
             logger.error("[DetectorService] Detection failed: %s", e, exc_info=True)
@@ -219,14 +263,20 @@ class DetectorService:
         else:
             logger.info("[DetectorService] thread=%s no entities detected", thread_id)
 
-        filtered_entities = [
-            e for e in detection.entities
-            if entity_matches_last_user_message(e, last_user_text)
-        ]
+        filtered_entities = []
+        for e in detection.entities:
+            matches = entity_matches_last_user_message(e, last_user_text)
+            if matches:
+                filtered_entities.append(e)
+            else:
+                logger.info(
+                    "[DetectorService] Stale entity rejected: type=%s title=%r (doesn't match user msg)",
+                    e.type, e.title,
+                )
         if detection.entities and not filtered_entities:
             logger.warning(
-                "[DetectorService] thread=%s all entities rejected as stale",
-                thread_id,
+                "[DetectorService] thread=%s ALL %d entities rejected as stale",
+                thread_id, len(detection.entities),
             )
         detection = detection.model_copy(update={"entities": filtered_entities})
 
@@ -247,11 +297,14 @@ class DetectorService:
 
         if proposal and proposal.show_chip:
             logger.info(
-                "[DetectorService] Chip ready thread=%s type=%s confidence=%.2f",
-                thread_id,
-                proposal.entity_type,
-                proposal.confidence,
+                "[DetectorService] ===== CHIP READY ===== thread=%s action=%s type=%s conf=%.2f title=%r existing_id=%s",
+                thread_id, proposal.action, proposal.entity_type,
+                proposal.confidence, proposal.preview.get("title", ""),
+                proposal.existing_entity_id,
             )
+        else:
+            logger.info("[DetectorService] ========== DETECTOR RUN END (no chip) ========== thread=%s", thread_id)
+
         return proposal if proposal and proposal.show_chip else None
 
     async def decline_proposal(

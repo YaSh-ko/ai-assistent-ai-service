@@ -4,6 +4,7 @@ from chat messages and returns structured results.
 """
 import json
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from app.models.detector import (
@@ -19,39 +20,42 @@ from app.services.llm_service import LLMService
 logger = logging.getLogger(__name__)
 
 # Minimum confidence after LLM call (before session accumulation)
-_EVENT_THRESHOLD_FREE = 0.55
-_EVENT_THRESHOLD_RHIZOME = 0.50
+_OBSERVATION_THRESHOLD_FREE = 0.55
+_OBSERVATION_THRESHOLD_RHIZOME = 0.50
 _GOAL_THRESHOLD = 0.55
-_EXPERIMENT_THRESHOLD = 0.55
-_CONCEPT_THRESHOLD_CHIP = 0.72
+_TASK_THRESHOLD = 0.55
+MAX_RESULTS = 5
 
-_SYSTEM_PROMPT = """Ты — аналитический агент системы Delёz (инструмент личного роста).
+_SYSTEM_PROMPT = """Ты — аналитический агент системы Delёz (бортовой журнал развития).
 Анализируй диалог и определяй, есть ли кандидаты на создание структурированных сущностей.
 
 Верни ТОЛЬКО валидный JSON без пояснений.
 
 Типы сущностей:
-1. event — конкретный опыт, ситуация, достижение или трудность из жизни пользователя
-2. goal — цель или намерение (SMART: что хочет достичь, срок, приоритет)
-3. experiment — гипотеза или эксперимент («попробую X и посмотрю на результат Y»)
-4. concept — вывод/правило из опыта (только если есть и ситуация, и намерение измениться)
+1. observation — наблюдение, мысль, осознание, факт или событие из жизни пользователя.
+   Что-то, что он заметил, пережил, понял. Не гипотеза, а факт/наблюдение.
+2. goal — конкретная цель. Что пользователь хочет достичь, к какому сроку, как поймёт что достиг.
+   Помни: хорошая цель конкретна и измерима.
+3. task — конкретный шаг или действие для движения к цели.
+   Маленькое, выполнимое за 1-7 дней. «Записаться на курс», «написать 5 людям», «сходить на митап».
 
 НЕ создавай сущности для:
 - технических вопросов к ассистенту
-- гипотетических рассуждений без личного опыта
+- гипотетических рассуждений без конкретики
 - чужого опыта без личного контекста автора
+- абстрактных размышлений без намерения действовать
 
-Формат ответа:
+Формат ответа — Наблюдение (observation):
 {
   "entities": [
     {
-      "type": "event",
+      "type": "observation",
       "confidence": 0.82,
-      "title": "Краткое название",
+      "title": "Краткое название (3-7 слов)",
       "fields": {
-        "description": "Описание из диалога",
-        "eventdate": "YYYY-MM-DD или null",
-        "importance": 0.7
+        "description": "Развёрнутое описание из контекста диалога (2-4 предложения)",
+        "event_date": "YYYY-MM-DD или null (дата когда произошло/замечено)",
+        "area": "область жизни: career|health|skills|relationships|finance|personal|other"
       }
     }
   ],
@@ -59,27 +63,44 @@ _SYSTEM_PROMPT = """Ты — аналитический агент систем�
   "updates": []
 }
 
-Цель (goal):
+Формат — Цель (goal):
 {
   "type": "goal",
   "confidence": 0.78,
-  "title": "Название цели",
-  "description": "Развёрнутое описание",
-  "target_date": "YYYY-MM-DD или null",
-  "priority": "low|medium|high"
+  "title": "Название цели (конкретное, 3-8 слов)",
+  "fields": {
+    "description": "Что именно хочет достичь и как поймёт что достиг (2-4 предложения)",
+    "target_date": "YYYY-MM-DD или null",
+    "priority": "low|medium|high",
+    "measurable": "Как измерить результат (1 предложение)",
+    "area": "career|health|skills|relationships|finance|personal|other"
+  }
 }
 
-Эксперимент (experiment):
+Формат — Задача (task):
 {
-  "type": "experiment",
+  "type": "task",
   "confidence": 0.76,
-  "title": "Название эксперимента",
-  "description": "Что именно попробует",
-  "hypothesis": "Ожидаемый результат"
+  "title": "Название задачи (конкретное действие, 3-8 слов)",
+  "fields": {
+    "description": "Что именно нужно сделать (1-3 предложения)",
+    "deadline": "YYYY-MM-DD или null (когда нужно выполнить)",
+    "area": "career|health|skills|relationships|finance|personal|other"
+  }
 }
 
 Если в промпте указан pending-кандидат — оцени, относится ли новое сообщение к ТОМУ ЖЕ кандидату.
 Если да — установи "same_topic_as_pending": true и повысь confidence.
+
+Если тема совпадает с СУЩЕСТВУЮЩЕЙ сущностью пользователя (они будут перечислены в промпте),
+верни action: "update" и existing_entity_id вместо создания дубликата.
+Пример update:
+{
+  "type": "goal", "confidence": 0.85, "action": "update",
+  "existing_entity_id": "uuid-of-existing-goal",
+  "title": "Исходное название цели",
+  "fields": {"description": "Дополненное описание с новой информацией из диалога"}
+}
 
 Если ничего не обнаружено: {"entities": [], "same_topic_as_pending": false, "updates": []}
 Верни ТОЛЬКО JSON."""
@@ -96,12 +117,19 @@ class DetectorAgent:
         thread_id: str,
         messages: List[Dict[str, Any]],
         context: DetectorContext,
+        existing_entities: Optional[List[Dict[str, Any]]] = None,
     ) -> DetectorResult:
         if not messages:
             return DetectorResult()
 
         recent = messages[-10:]
-        prompt = self._build_prompt(recent, context)
+        prompt = self._build_prompt(recent, context, existing_entities=existing_entities)
+
+        logger.info(
+            "[DetectorAgent] === Detect start === thread=%s msgs=%d existing_entities=%d",
+            thread_id, len(recent), len(existing_entities) if existing_entities else 0,
+        )
+        logger.debug("[DetectorAgent] Full prompt (%d chars):\n%s", len(prompt), prompt[:2000])
 
         try:
             raw = await self._llm.generate(
@@ -111,16 +139,91 @@ class DetectorAgent:
                 temperature=0.1,
                 max_tokens=1024,
             )
+            logger.info("[DetectorAgent] LLM raw response (%d chars): %s", len(raw), raw[:500])
             result = self._parse_llm_response(raw)
         except Exception as e:
-            logger.error("[DetectorAgent] LLM call failed for thread %s: %s", thread_id, e)
+            logger.error("[DetectorAgent] LLM call failed for thread %s: %s", thread_id, e, exc_info=True)
             return DetectorResult()
 
+        if result.entities:
+            for i, ent in enumerate(result.entities):
+                logger.info(
+                    "[DetectorAgent] Parsed entity #%d: type=%s action=%s conf=%.2f title=%r existing_id=%s fields=%s",
+                    i + 1, ent.type, ent.action, ent.confidence, ent.title,
+                    ent.existing_entity_id, list((ent.fields or {}).keys()),
+                )
+        else:
+            logger.info("[DetectorAgent] LLM returned no entities")
+
+        result = self._sanitize_update_actions(result, existing_entities)
+
+        pre_filter_count = len(result.entities)
         result = self._apply_session_filters(result, context.session_state)
+        if len(result.entities) < pre_filter_count:
+            logger.info(
+                "[DetectorAgent] Session filter removed %d entities (declined)",
+                pre_filter_count - len(result.entities),
+            )
+
+        pre_ctx_count = len(result.entities)
         result = self._apply_context_rules(result, context)
+        if len(result.entities) < pre_ctx_count:
+            logger.info(
+                "[DetectorAgent] Context rules removed %d entities (threshold/type)",
+                pre_ctx_count - len(result.entities),
+            )
+
         result = self._normalize_same_topic_flag(result, context.session_state)
         result = self._keep_top_chip_entity(result)
 
+        logger.info(
+            "[DetectorAgent] === Detect done === thread=%s final_entities=%d same_topic=%s",
+            thread_id, len(result.entities), result.same_topic_as_pending,
+        )
+        return result
+
+    _UUID_RE = re.compile(
+        r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+    )
+
+    def _sanitize_update_actions(
+        self,
+        result: DetectorResult,
+        existing_entities: Optional[List[Dict[str, Any]]],
+    ) -> DetectorResult:
+        """
+        Prevent LLM hallucinations: if no existing entities were provided,
+        or the returned existing_entity_id is not a valid UUID,
+        force action back to 'create'.
+        """
+        valid_map: Dict[str, str] = {}
+        if existing_entities:
+            for e in existing_entities:
+                eid = e.get("entity_id", "")
+                if eid and self._UUID_RE.match(eid):
+                    valid_map[eid] = e.get("title", "")
+
+        changed = False
+        sanitized = []
+        for ent in result.entities:
+            if ent.action == "update":
+                eid = ent.existing_entity_id or ""
+                if not self._UUID_RE.match(eid) or eid not in valid_map:
+                    logger.warning(
+                        "[DetectorAgent] Sanitized hallucinated update: existing_id=%r → forced to create",
+                        eid[:60],
+                    )
+                    ent = ent.model_copy(update={"action": "create", "existing_entity_id": None, "existing_title": None})
+                    changed = True
+                else:
+                    real_title = valid_map[eid]
+                    if real_title and ent.existing_title != real_title:
+                        ent = ent.model_copy(update={"existing_title": real_title})
+                        changed = True
+            sanitized.append(ent)
+
+        if changed:
+            return result.model_copy(update={"entities": sanitized})
         return result
 
     def _normalize_same_topic_flag(
@@ -140,20 +243,21 @@ class DetectorAgent:
         self,
         messages: List[Dict[str, Any]],
         context: DetectorContext,
+        existing_entities: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         lines: List[str] = []
 
         if context.is_event_context:
             lines.append(
-                f"Чат привязан к существующей записи (ID: {context.entity_id}). "
-                "НЕ предлагай новый event. Ищи goal, experiment или обогащение (updates)."
+                f"Чат привязан к существующему наблюдению (ID: {context.entity_id}). "
+                "НЕ предлагай новое observation. Ищи goal, task или обогащение (updates)."
             )
         elif context.is_rhizome_context:
             lines.append(
-                "Чат с главного экрана — будь внимательнее к event, goal и experiment."
+                "Чат с главного экрана — ищи observation, goal и task."
             )
         else:
-            lines.append("Свободный чат. Ищи event, goal и experiment.")
+            lines.append("Свободный чат. Ищи observation, goal и task.")
 
         active = context.session_state.active
         shelved = context.session_state.shelved
@@ -189,6 +293,22 @@ class DetectorAgent:
                 "Если пользователь сменил тему (цель → событие или наоборот), "
                 "верни новую сущность и same_topic_as_pending: false."
             )
+
+        if existing_entities:
+            lines.append(
+                "\n## Существующие сущности пользователя (найдены по смыслу):\n"
+                "Если тема диалога совпадает с одной из них — верни action: \"update\" "
+                "и existing_entity_id. НЕ создавай дубликат."
+            )
+            for ent in existing_entities[:MAX_RESULTS]:
+                etype = ent.get("entity_type", "?")
+                eid = ent.get("entity_id", "?")
+                etitle = ent.get("title", "")
+                edesc = ent.get("description", "")[:120]
+                estatus = ent.get("status", "")
+                lines.append(
+                    f"  - [{etype}] id={eid} «{etitle}» status={estatus} | {edesc}"
+                )
 
         lines.append("\nПоследние сообщения диалога:")
         for msg in messages:
@@ -253,25 +373,24 @@ class DetectorAgent:
     ) -> DetectorResult:
         filtered = []
         for entity in result.entities:
-            if entity.type == "event":
+            if entity.type == "observation":
                 if context.is_event_context:
                     continue
                 threshold = (
-                    _EVENT_THRESHOLD_RHIZOME
+                    _OBSERVATION_THRESHOLD_RHIZOME
                     if context.is_rhizome_context
-                    else _EVENT_THRESHOLD_FREE
+                    else _OBSERVATION_THRESHOLD_FREE
                 )
                 if entity.confidence < threshold:
                     continue
             elif entity.type == "goal":
                 if entity.confidence < _GOAL_THRESHOLD:
                     continue
-            elif entity.type == "experiment":
-                if entity.confidence < _EXPERIMENT_THRESHOLD:
+            elif entity.type == "task":
+                if entity.confidence < _TASK_THRESHOLD:
                     continue
-            elif entity.type == "concept":
-                if entity.confidence < _CONCEPT_THRESHOLD_CHIP:
-                    continue
+            else:
+                continue
             filtered.append(entity)
 
         return DetectorResult(

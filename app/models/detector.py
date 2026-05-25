@@ -10,16 +10,14 @@ from pydantic import AliasChoices, BaseModel, Field, model_validator
 # Confidence thresholds (tunable)
 PENDING_START_THRESHOLD = 0.55
 CHIP_THRESHOLDS: Dict[str, float] = {
-    "event": 0.80,
+    "observation": 0.80,
     "goal": 0.80,
-    "experiment": 0.80,
+    "task": 0.80,
 }
 SAME_TOPIC_CONFIDENCE_BOOST = 0.12
-# Re-show chip for same pending_id if confidence grew by at least this much
 CHIP_RESHOW_CONFIDENCE_DELTA = 0.10
 
-# Entity types that participate in pending / confirmation chip flow
-CHIP_ENTITY_TYPES = frozenset({"event", "goal", "experiment"})
+CHIP_ENTITY_TYPES = frozenset({"observation", "goal", "task"})
 
 
 class ProposedEntity(BaseModel):
@@ -40,12 +38,15 @@ class CreatedEntity(BaseModel):
 class PendingCandidate(BaseModel):
     """Accumulated candidate stored in session until user confirms or declines."""
     id: str
-    type: str  # event | goal | experiment
+    type: str  # observation | goal | task
     title: str
     fields: Dict[str, Any] = Field(default_factory=dict)
     confidence: float
     message_count: int = 1
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    action: str = "create"  # "create" | "update"
+    existing_entity_id: Optional[str] = None
+    existing_title: Optional[str] = None
 
 
 class SessionState(BaseModel):
@@ -63,6 +64,7 @@ class SessionState(BaseModel):
     )
     shelved: List[PendingCandidate] = Field(default_factory=list)
     chip_shown_for: Optional[str] = None
+    chip_shown_action: Optional[str] = None
     last_proposal: Optional[Dict[str, Any]] = None
     proposed_entities: List[ProposedEntity] = Field(default_factory=list)
     created_entities: List[CreatedEntity] = Field(default_factory=list)
@@ -92,9 +94,9 @@ class SessionState(BaseModel):
             for e in self.proposed_entities
         )
 
-    def get_created_event_id(self) -> Optional[str]:
+    def get_created_observation_id(self) -> Optional[str]:
         for e in self.created_entities:
-            if e.type == "event":
+            if e.type in ("observation", "event"):
                 return e.entity_id
         return None
 
@@ -107,27 +109,31 @@ class DetectorContext(BaseModel):
 
     @property
     def is_event_context(self) -> bool:
-        return self.entity_id is not None and self.entity_type in (None, "event", "entry")
+        return self.entity_id is not None and self.entity_type in (
+            None, "event", "entry", "observation",
+        )
 
     @property
     def is_rhizome_context(self) -> bool:
-        return self.entity_type == "event" and self.entity_id is None
+        return self.entity_type in ("event", "observation") and self.entity_id is None
 
 
 class DetectedEntity(BaseModel):
     """A single entity detected by the LLM."""
-    type: str
+    type: str  # observation | goal | task
     confidence: float
     title: Optional[str] = None
     fields: Optional[Dict[str, Any]] = None
     description: Optional[str] = None
     target_date: Optional[str] = None
+    deadline: Optional[str] = None
     priority: Optional[str] = None
-    hypothesis: Optional[str] = None
+    measurable: Optional[str] = None
+    area: Optional[str] = None
     name: Optional[str] = None
-    grounds: Optional[List[Dict[str, Any]]] = None
-    transformations: Optional[List[Dict[str, Any]]] = None
-    similar_existing: Optional[List[Dict[str, Any]]] = None
+    action: str = "create"  # "create" | "update"
+    existing_entity_id: Optional[str] = None
+    existing_title: Optional[str] = None
 
 
 class FieldUpdate(BaseModel):
@@ -149,12 +155,14 @@ class DetectorResult(BaseModel):
 class DetectorProposal(BaseModel):
     """Payload for frontend confirmation chip (SSE event detector_proposal)."""
     show_chip: bool = False
-    action: str = "confirm_create"
+    action: str = "confirm_create"  # "confirm_create" | "confirm_update"
     entity_type: str = ""
     confidence: float = 0.0
     pending_id: str = ""
     preview: Dict[str, Any] = Field(default_factory=dict)
     revived: bool = False
+    existing_entity_id: Optional[str] = None
+    existing_title: Optional[str] = None
 
 
 class DetectEntitiesRequest(BaseModel):

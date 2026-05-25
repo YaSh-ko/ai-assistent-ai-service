@@ -5,6 +5,7 @@ from app.factory.database_factory import DatabaseFactory
 from app.data_access.postgresql.chat_session_repository import ChatSessionRepository
 from app.services.session_manager import SessionManager
 from app.services.detector_service import DetectorService
+from app.services.entity_index_service import EntityIndexService
 from app.providers.databases.postgres_provider import PostgresProvider
 from app.chains.rag_chain import RAGChain
 from app.services.embedding_service import EmbeddingService
@@ -109,7 +110,14 @@ async def get_detector_service() -> DetectorService:
     async with _detector_service_lock:
         if _detector_service is None:
             session_manager = await get_session_manager()
-            _detector_service = DetectorService(session_manager)
+            postgres_provider = DatabaseFactory.create_relational_database()
+            if not postgres_provider.pool:
+                await postgres_provider.connect()
+            embeddings_provider = GigaChatEmbeddings()
+            entity_index = EntityIndexService(postgres_provider, embeddings_provider)
+            _detector_service = DetectorService(
+                session_manager, entity_index=entity_index,
+            )
     return _detector_service
 
 

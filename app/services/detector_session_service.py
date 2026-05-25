@@ -49,23 +49,30 @@ def _entity_fields(entity: DetectedEntity) -> dict:
         fields["description"] = entity.description
     if entity.target_date:
         fields["target_date"] = entity.target_date
+    if entity.deadline:
+        fields["deadline"] = entity.deadline
     if entity.priority:
         fields["priority"] = entity.priority
-    if entity.hypothesis:
-        fields["hypothesis"] = entity.hypothesis
+    if entity.measurable:
+        fields["measurable"] = entity.measurable
+    if entity.area:
+        fields["area"] = entity.area
     if entity.type == "goal" and "status" not in fields:
         fields["status"] = "active"
-    if entity.type == "experiment" and "status" not in fields:
-        fields["status"] = "active"
+    if entity.type == "task" and "status" not in fields:
+        fields["status"] = "todo"
     return fields
 
 
 def build_preview(candidate: PendingCandidate) -> dict:
     preview: dict = {"title": candidate.title, **candidate.fields}
-    if candidate.type == "event":
-        preview["event_date"] = candidate.fields.get("eventdate") or candidate.fields.get(
-            "event_date"
+    if candidate.type == "observation":
+        preview["event_date"] = (
+            candidate.fields.get("event_date")
+            or candidate.fields.get("eventdate")
         )
+    if candidate.type == "task":
+        preview["deadline"] = candidate.fields.get("deadline")
     return preview
 
 
@@ -83,25 +90,39 @@ class DetectorSessionService:
         state = session_state.model_copy(deep=True)
         chip_entity = self._pick_chip_entity(detection, preferred_type=preferred_type)
         if chip_entity is None:
-            logger.debug("[Detector] No chip entity in LLM result")
+            logger.info("[DetectorSession] No chip entity in LLM result (all filtered or empty)")
             return state, None
 
         title = _entity_display_title(chip_entity)
-        if not title or state.is_declined(title):
+        logger.info(
+            "[DetectorSession] === Processing chip entity === type=%s action=%s conf=%.2f title=%r existing_id=%s",
+            chip_entity.type, chip_entity.action, chip_entity.confidence, title,
+            chip_entity.existing_entity_id,
+        )
+
+        if not title:
+            logger.info("[DetectorSession] Rejected: empty title")
+            return state, None
+        if state.is_declined(title):
+            logger.info("[DetectorSession] Rejected: title previously declined: %r", title)
             return state, None
         if chip_entity.confidence < PENDING_START_THRESHOLD:
-            logger.debug(
-                "[Detector] Below pending threshold: %s %.2f",
-                chip_entity.type,
-                chip_entity.confidence,
+            logger.info(
+                "[DetectorSession] Rejected: below pending threshold %.2f < %.2f",
+                chip_entity.confidence, PENDING_START_THRESHOLD,
             )
             return state, None
 
         shelved_idx = self._find_shelved_index(state.shelved, chip_entity, detection)
+
+        titles_match = _titles_similar(state.active.title, title) if state.active else False
+        llm_says_same = detection.same_topic_as_pending
+
         same_type_new_topic = (
             state.active is not None
             and state.active.type == chip_entity.type
-            and not _titles_similar(state.active.title, title)
+            and not titles_match
+            and not llm_says_same
         )
         topic_switch = (
             shelved_idx is None
@@ -111,17 +132,24 @@ class DetectorSessionService:
                 or same_type_new_topic
             )
         )
+
+        if state.active and state.active.type == chip_entity.type and not titles_match and llm_says_same:
+            logger.info(
+                "[DetectorSession] LLM says same topic despite different titles: %r → %r (trusting LLM)",
+                state.active.title, title,
+            )
+
         if same_type_new_topic:
             detection = detection.model_copy(update={"same_topic_as_pending": False})
             logger.info(
-                "[Detector] New %s topic (was: %s)",
+                "[DetectorSession] New %s topic (was: %s)",
                 chip_entity.type,
                 state.active.title,
             )
         if topic_switch:
             detection = detection.model_copy(update={"same_topic_as_pending": False})
             logger.info(
-                "[Detector] Topic switch %s -> %s",
+                "[DetectorSession] Topic switch %s -> %s",
                 state.active.type,
                 chip_entity.type,
             )
@@ -150,43 +178,50 @@ class DetectorSessionService:
             state.active = self._new_pending(chip_entity)
 
         if not state.active:
+            logger.info("[DetectorSession] No active candidate after processing")
             return state, None
 
         chip_threshold = CHIP_THRESHOLDS.get(state.active.type, 0.85)
+        logger.info(
+            "[DetectorSession] Active candidate: type=%s action=%s conf=%.2f threshold=%.2f title=%r existing_id=%s",
+            state.active.type, state.active.action, state.active.confidence,
+            chip_threshold, state.active.title, state.active.existing_entity_id,
+        )
+
         if state.active.confidence < chip_threshold:
-            logger.debug(
-                "[Detector] Below chip threshold: %s %.2f < %.2f",
-                state.active.type,
-                state.active.confidence,
-                chip_threshold,
+            logger.info(
+                "[DetectorSession] Below chip threshold: %.2f < %.2f — accumulating, no chip yet",
+                state.active.confidence, chip_threshold,
             )
             return state, None
 
         if not self._should_emit_chip(state, revived=revived, topic_switch=topic_switch):
-            logger.debug(
-                "[Detector] Chip suppressed for id=%s (shown_for=%s)",
-                state.active.id,
-                state.chip_shown_for,
+            logger.info(
+                "[DetectorSession] Chip suppressed: id=%s already shown (chip_shown_for=%s, action=%s, shown_action=%s)",
+                state.active.id, state.chip_shown_for,
+                state.active.action, state.chip_shown_action,
             )
             return state, None
 
         state.chip_shown_for = state.active.id
+        state.chip_shown_action = state.active.action or "create"
+        is_update = state.active.action == "update" and state.active.existing_entity_id
         proposal = DetectorProposal(
             show_chip=True,
-            action="confirm_create",
+            action="confirm_update" if is_update else "confirm_create",
             entity_type=state.active.type,
             confidence=round(state.active.confidence, 3),
             pending_id=state.active.id,
             preview=build_preview(state.active),
             revived=revived,
+            existing_entity_id=state.active.existing_entity_id if is_update else None,
+            existing_title=(state.active.existing_title or state.active.title) if is_update else None,
         )
         state.last_proposal = proposal.model_dump(mode="json")
         logger.info(
-            "[Detector] Emitting chip type=%s title=%s conf=%.2f revived=%s",
-            state.active.type,
-            state.active.title,
-            state.active.confidence,
-            revived,
+            "[DetectorSession] === EMITTING CHIP === action=%s type=%s conf=%.2f title=%r is_update=%s existing_id=%s revived=%s",
+            proposal.action, state.active.type, state.active.confidence,
+            state.active.title, is_update, state.active.existing_entity_id, revived,
         )
         return state, proposal
 
@@ -199,7 +234,7 @@ class DetectorSessionService:
     ) -> SessionState:
         state = session_state.model_copy(deep=True)
         declined_title: Optional[str] = title
-        declined_type = "event"
+        declined_type = "observation"
 
         if pending_id:
             if state.active and state.active.id == pending_id:
@@ -214,11 +249,13 @@ class DetectorSessionService:
             state.shelved = [s for s in state.shelved if s.id != pending_id]
             if state.chip_shown_for == pending_id:
                 state.chip_shown_for = None
+                state.chip_shown_action = None
         elif state.active:
             declined_title = declined_title or state.active.title
             declined_type = state.active.type
             if state.chip_shown_for == state.active.id:
                 state.chip_shown_for = None
+                state.chip_shown_action = None
             state.active = None
 
         if declined_title:
@@ -249,6 +286,7 @@ class DetectorSessionService:
         if pid:
             state.shelved = [s for s in state.shelved if s.id != pid]
         state.chip_shown_for = None
+        state.chip_shown_action = None
         state.last_proposal = None
         state.created_entities.append(CreatedEntity(type=entity_type, entity_id=entity_id))
         state.proposed_entities.append(
@@ -273,6 +311,13 @@ class DetectorSessionService:
         if revived or topic_switch:
             return True
         if state.chip_shown_for != state.active.id:
+            return True
+        current_action = state.active.action or "create"
+        if state.chip_shown_action and state.chip_shown_action != current_action:
+            logger.info(
+                "[DetectorSession] Action changed %s → %s — re-emitting chip",
+                state.chip_shown_action, current_action,
+            )
             return True
         return False
 
@@ -340,6 +385,9 @@ class DetectorSessionService:
             confidence=entity.confidence,
             message_count=1,
             updated_at=datetime.now(timezone.utc).isoformat(),
+            action=entity.action or "create",
+            existing_entity_id=entity.existing_entity_id,
+            existing_title=entity.existing_title,
         )
 
     def _reinforce_pending(
@@ -355,6 +403,10 @@ class DetectorSessionService:
         title = pending.title
         if entity.confidence > pending.confidence and _entity_display_title(entity):
             title = _entity_display_title(entity)
+        new_action = entity.action or pending.action or "create"
+        new_existing_id = entity.existing_entity_id or pending.existing_entity_id
+        new_existing_title = entity.existing_title or pending.existing_title
+
         return PendingCandidate(
             id=pending.id,
             type=pending.type,
@@ -363,4 +415,7 @@ class DetectorSessionService:
             confidence=new_confidence,
             message_count=pending.message_count + 1,
             updated_at=datetime.now(timezone.utc).isoformat(),
+            action=new_action,
+            existing_entity_id=new_existing_id,
+            existing_title=new_existing_title,
         )
