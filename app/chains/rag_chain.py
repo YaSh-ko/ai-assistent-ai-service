@@ -110,9 +110,9 @@ class RAGChain(BaseChain):
         tokens = {"simple": 500, "medium": 1500, "complex": 2000}
         return tokens.get(complexity, 1500)
     
-    def _build_system_prompt(self) -> str:
+    def _build_system_prompt(self, persona_tone: str = "", persona_role: str = "") -> str:
         """Построение системного промпта для ассистента Delёz."""
-        return (
+        base = (
             "Ты — Delёz, персональный ассистент для осознанного развития.\n"
             "Ты работаешь как «бортовой журнал»: помогаешь пользователю фиксировать наблюдения, "
             "формулировать цели и раскладывать их на конкретные задачи.\n\n"
@@ -130,6 +130,14 @@ class RAGChain(BaseChain):
             "4. Ссылайся на прошлые записи пользователя, когда это помогает увидеть картину\n"
             "5. Ты НЕ психолог и НЕ терапевт — ты инструмент для систематизации опыта и движения вперёд"
         )
+        if persona_tone or persona_role:
+            base += "\n\nПользователь выбрал персональные настройки:"
+            if persona_tone:
+                base += f"\n- Тон общения: {persona_tone}"
+            if persona_role:
+                base += f"\n- Роль ассистента: {persona_role}"
+            base += "\nСледуй этим настройкам в ответах."
+        return base
     
     def build_graph(self) -> StateGraph:
         """Построение LangGraph графа."""
@@ -778,6 +786,8 @@ class RAGChain(BaseChain):
         thread_id: str,
         user_question: str,
         user_id: str,
+        persona_tone: str = "",
+        persona_role: str = "",
     ) -> tuple[AsyncGenerator[Any, None], Dict[str, Any]]:
         """
         Оркестратор обработки сообщения пользователя (5 этапов).
@@ -847,11 +857,12 @@ class RAGChain(BaseChain):
             from app.core.model_selector import ModelSelector
             params = ModelSelector.get_params(state.get("complexity", "simple"))
             
-            # Создаем генератор для LLM
+            system_prompt = self._build_system_prompt(persona_tone, persona_role)
+
             llm_stream = self.llm_service.stream_response(
                 prompt=full_prompt,
                 model_name=state.get("selected_model", "gigachat"),
-                system_prompt=self.system_prompt,
+                system_prompt=system_prompt,
                 session_id=thread_id,
                 temperature=params.get("temperature", 0.7),
                 max_tokens=params.get("max_tokens", 1024)

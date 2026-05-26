@@ -22,6 +22,48 @@ from app.services.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
 
+_persona_engine = None
+
+
+def _get_persona_engine():
+    """Lazy-create a standalone async engine for persona queries."""
+    global _persona_engine
+    if _persona_engine is not None:
+        return _persona_engine
+    try:
+        from app.core.config import settings
+        url = settings.POSTGRES_URL
+        if not url:
+            return None
+        if not url.startswith("postgresql+asyncpg://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        from sqlalchemy.ext.asyncio import create_async_engine
+        _persona_engine = create_async_engine(url, pool_size=2, max_overflow=0)
+        return _persona_engine
+    except Exception as e:
+        logger.warning("Cannot create persona engine: %s", e)
+        return None
+
+
+async def _fetch_user_persona(user_id: str) -> tuple[str, str]:
+    """Fetch persona settings from the user table. Returns (tone, role)."""
+    engine = _get_persona_engine()
+    if not engine:
+        return "", ""
+    try:
+        from sqlalchemy import text as sql_text
+        async with engine.connect() as conn:
+            result = await conn.execute(
+                sql_text('SELECT ai_persona_tone, ai_persona_role FROM "user" WHERE id = :uid'),
+                {"uid": user_id},
+            )
+            row = result.one_or_none()
+            if row:
+                return row[0] or "", row[1] or ""
+    except Exception as e:
+        logger.warning("Failed to fetch persona for %s: %s", user_id, e)
+    return "", ""
+
 router = APIRouter(prefix="/threads/{thread_id}/runs", tags=["runs"])
 
 
@@ -185,6 +227,8 @@ async def _stream_and_save_response(
     session_manager: SessionManager,
     detector_service: DetectorService,
     is_first_message: bool = False,
+    persona_tone: str = "",
+    persona_role: str = "",
 ):
     """Internal generator to stream RAGChain output and save state."""
     yield _format_sse("metadata", {"run_id": run_id})
@@ -216,6 +260,8 @@ async def _stream_and_save_response(
             thread_id=thread_id,
             user_question=user_message,
             user_id=user_id,
+            persona_tone=persona_tone,
+            persona_role=persona_role,
         )
 
         full_response = ""
@@ -310,12 +356,17 @@ async def stream_run_create(
     
     run_id = str(uuid.uuid4())
     is_first_message = not existing_messages and not is_regeneration
+
+    persona_tone, persona_role = await _fetch_user_persona(user_id)
+
     return StreamingResponse(
         _stream_and_save_response(
             thread_id, run_id, request.assistant_id, user_message, user_id,
             full_messages_history, checkpoint_id, is_regeneration,
             rag_chain, session_manager, detector_service,
             is_first_message=is_first_message,
+            persona_tone=persona_tone,
+            persona_role=persona_role,
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},

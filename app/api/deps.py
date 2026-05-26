@@ -104,17 +104,30 @@ async def get_session_manager() -> SessionManager:
                 raise RuntimeError("SessionManager requires PostgresProvider")
     return _session_manager
 
+_entity_index = None
+_entity_index_lock = asyncio.Lock()
+
+
+async def get_entity_index() -> EntityIndexService:
+    """Dependency to get EntityIndexService singleton."""
+    global _entity_index
+    async with _entity_index_lock:
+        if _entity_index is None:
+            postgres_provider = DatabaseFactory.create_relational_database()
+            if not postgres_provider.pool:
+                await postgres_provider.connect()
+            embeddings_provider = GigaChatEmbeddings()
+            _entity_index = EntityIndexService(postgres_provider, embeddings_provider)
+    return _entity_index
+
+
 async def get_detector_service() -> DetectorService:
     """Dependency to get DetectorService singleton."""
     global _detector_service
     async with _detector_service_lock:
         if _detector_service is None:
             session_manager = await get_session_manager()
-            postgres_provider = DatabaseFactory.create_relational_database()
-            if not postgres_provider.pool:
-                await postgres_provider.connect()
-            embeddings_provider = GigaChatEmbeddings()
-            entity_index = EntityIndexService(postgres_provider, embeddings_provider)
+            entity_index = await get_entity_index()
             _detector_service = DetectorService(
                 session_manager, entity_index=entity_index,
             )
