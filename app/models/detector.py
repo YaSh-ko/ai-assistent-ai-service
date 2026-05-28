@@ -106,6 +106,7 @@ class DetectorContext(BaseModel):
     entity_type: Optional[str] = None
     entity_id: Optional[str] = None
     session_state: SessionState = Field(default_factory=SessionState)
+    thread_context: Dict[str, Any] = Field(default_factory=dict)
 
     @property
     def is_event_context(self) -> bool:
@@ -116,6 +117,10 @@ class DetectorContext(BaseModel):
     @property
     def is_rhizome_context(self) -> bool:
         return self.entity_type in ("event", "observation") and self.entity_id is None
+
+    @property
+    def is_goal_context(self) -> bool:
+        return self.entity_type == "goal" and self.entity_id is not None
 
 
 class DetectedEntity(BaseModel):

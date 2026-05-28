@@ -214,6 +214,24 @@ async def _generate_and_save_title(
         logger.error("Failed to save title for thread %s: %s", thread_id, e)
 
 
+async def _sync_thread_context(
+    thread_id: str,
+    thread_context: Optional[Dict[str, Any]],
+    session_manager: SessionManager,
+) -> None:
+    """Persist per-message goal focus for the detector (clears when focus dismissed)."""
+    session = await session_manager.get_session(thread_id)
+    if not session:
+        return
+    base = session.context if isinstance(session.context, dict) else {}
+    merged = dict(base)
+    if thread_context and isinstance(thread_context, dict):
+        merged["thread_context"] = thread_context
+    else:
+        merged.pop("thread_context", None)
+    await session_manager.update_session(thread_id, {"context": merged})
+
+
 async def _stream_and_save_response(
     thread_id: str,
     run_id: str,
@@ -229,12 +247,14 @@ async def _stream_and_save_response(
     is_first_message: bool = False,
     persona_tone: str = "",
     persona_role: str = "",
+    thread_context: Optional[Dict[str, Any]] = None,
 ):
     """Internal generator to stream RAGChain output and save state."""
     yield _format_sse("metadata", {"run_id": run_id})
     yield _format_sse("values", {"messages": full_messages_history})
 
     try:
+        await _sync_thread_context(thread_id, thread_context, session_manager)
         # Save intermediate state with only human messages (no AI yet).
         # This becomes the parent_checkpoint for the AI response,
         # so regeneration replays from the correct human message.
@@ -358,6 +378,9 @@ async def stream_run_create(
     is_first_message = not existing_messages and not is_regeneration
 
     persona_tone, persona_role = await _fetch_user_persona(user_id)
+    thread_context = None
+    if isinstance(request.metadata, dict) and "thread_context" in request.metadata:
+        thread_context = request.metadata.get("thread_context")
 
     return StreamingResponse(
         _stream_and_save_response(
@@ -367,6 +390,7 @@ async def stream_run_create(
             is_first_message=is_first_message,
             persona_tone=persona_tone,
             persona_role=persona_role,
+            thread_context=thread_context,
         ),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},

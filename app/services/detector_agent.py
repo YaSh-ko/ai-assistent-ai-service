@@ -36,8 +36,10 @@ _SYSTEM_PROMPT = """Ты — аналитический агент систем�
    Что-то, что он заметил, пережил, понял. Не гипотеза, а факт/наблюдение.
 2. goal — конкретная цель. Что пользователь хочет достичь, к какому сроку, как поймёт что достиг.
    Помни: хорошая цель конкретна и измерима.
-3. task — конкретный шаг или действие для движения к цели.
-   Маленькое, выполнимое за 1-7 дней. «Записаться на курс», «написать 5 людям», «сходить на митап».
+3. task — один конкретный шаг к цели.
+   Выполним за одну сессию (до 90 мин) или 1–3 дня. В title — глагол + измеримый результат.
+   Примеры: «Отправить 2 письма менторам», «Пройти урок 1 и конспект на 5 пунктов».
+   НЕ предлагай: «составить план», «работать над», «улучшить», «заниматься».
 
 НЕ создавай сущности для:
 - технических вопросов к ассистенту
@@ -81,9 +83,9 @@ _SYSTEM_PROMPT = """Ты — аналитический агент систем�
 {
   "type": "task",
   "confidence": 0.76,
-  "title": "Название задачи (конкретное действие, 3-8 слов)",
+  "title": "Одно действие с измеримым результатом (5-12 слов)",
   "fields": {
-    "description": "Что именно нужно сделать (1-3 предложения)",
+    "description": "Критерий «готово» — когда шаг считается выполненным (1-2 предложения)",
     "deadline": "YYYY-MM-DD или null (когда нужно выполнить)",
     "area": "career|health|skills|relationships|finance|personal|other"
   }
@@ -247,7 +249,31 @@ class DetectorAgent:
     ) -> str:
         lines: List[str] = []
 
-        if context.is_event_context:
+        if context.is_goal_context:
+            tc = context.thread_context or {}
+            lines.append(
+                f"Чат привязан к цели (ID: {context.entity_id}). "
+                "Это приоритетный контекст — 100% сообщений относятся к этой цели."
+            )
+            lines.append(f"Цель: «{tc.get('title', '')}»")
+            if tc.get("description"):
+                lines.append(f"Описание цели: {tc.get('description')}")
+            if tc.get("target_date"):
+                lines.append(f"Дедлайн цели: {tc.get('target_date')}")
+            existing_tasks = tc.get("existing_tasks") or []
+            if existing_tasks:
+                lines.append("Уже есть шаги (не дублируй):")
+                for t in existing_tasks[:15]:
+                    lines.append(f"  - {t}")
+            lines.append(
+                "Правила:\n"
+                "- Новые шаги → type task, action create (конкретное действие).\n"
+                "- Уточнение цели (описание, срок, приоритет) → type goal, action update, "
+                f"existing_entity_id: {context.entity_id}.\n"
+                "- НЕ создавай новую goal.\n"
+                "- Не предлагай observation, если пользователь не описывает отдельное жизненное событие."
+            )
+        elif context.is_event_context:
             lines.append(
                 f"Чат привязан к существующему наблюдению (ID: {context.entity_id}). "
                 "НЕ предлагай новое observation. Ищи goal, task или обогащение (updates)."
@@ -257,7 +283,10 @@ class DetectorAgent:
                 "Чат с главного экрана — ищи observation, goal и task."
             )
         else:
-            lines.append("Свободный чат. Ищи observation, goal и task.")
+            lines.append(
+                "Свободный чат. Ищи observation и goal. "
+                "Не предлагай task без привязки к цели — шаги планируются в чате конкретной цели."
+            )
 
         active = context.session_state.active
         shelved = context.session_state.shelved

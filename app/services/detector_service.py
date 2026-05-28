@@ -148,8 +148,9 @@ def build_detector_context(session_context: Dict[str, Any], state: SessionState)
     entity_id = chat_ctx.get("id") or chat_ctx.get("entity_id")
     return DetectorContext(
         entity_type=entity_type,
-        entity_id=entity_id,
+        entity_id=str(entity_id) if entity_id else None,
         session_state=state,
+        thread_context=chat_ctx if isinstance(chat_ctx, dict) else {},
     )
 
 
@@ -211,6 +212,8 @@ class DetectorService:
             context.session_state = state
 
         preferred_type = guess_focus_type_from_messages(focus_messages)
+        if context.is_goal_context:
+            preferred_type = "task"
 
         existing_entities = None
         if self._entity_index and last_user_text:
@@ -239,6 +242,20 @@ class DetectorService:
                     logger.warning("[DetectorService] Entity search failed: %s", e, exc_info=True)
         elif not self._entity_index:
             logger.debug("[DetectorService] Entity index not configured, skipping search")
+
+        if context.is_goal_context and context.entity_id:
+            pinned_goal = {
+                "entity_id": context.entity_id,
+                "entity_type": "goal",
+                "title": context.thread_context.get("title", ""),
+                "description": context.thread_context.get("description", ""),
+                "status": "active",
+            }
+            rest = [
+                e for e in (existing_entities or [])
+                if e.get("entity_id") != context.entity_id
+            ]
+            existing_entities = [pinned_goal, *rest]
 
         try:
             detection = await self._agent.detect(
@@ -278,6 +295,24 @@ class DetectorService:
                 "[DetectorService] thread=%s ALL %d entities rejected as stale",
                 thread_id, len(detection.entities),
             )
+        if not context.is_goal_context:
+            filtered_entities = [e for e in filtered_entities if e.type != "task"]
+        elif context.entity_id:
+            normalized = []
+            for e in filtered_entities:
+                if e.type == "goal" and e.action != "update":
+                    continue
+                if e.type == "goal" and not e.existing_entity_id:
+                    e = e.model_copy(
+                        update={
+                            "action": "update",
+                            "existing_entity_id": context.entity_id,
+                            "existing_title": context.thread_context.get("title"),
+                        }
+                    )
+                normalized.append(e)
+            filtered_entities = normalized
+
         detection = detection.model_copy(update={"entities": filtered_entities})
 
         new_state, proposal = self._logic.process_detection(
