@@ -97,7 +97,7 @@ class RAGChain(BaseChain):
         self.search_top_k = 10  # ШАГ 1: Количество результатов поиска
         self.rerank_top_k = 5   # ШАГ 2: Количество после фильтрации
         
-        # Системный промпт для Delёz
+        # Системный промпт для Impulse
         self.system_prompt = self._build_system_prompt()
     
     def _get_temperature_for_complexity(self, complexity: str) -> float:
@@ -111,9 +111,9 @@ class RAGChain(BaseChain):
         return tokens.get(complexity, 1500)
     
     def _build_system_prompt(self, persona_tone: str = "", persona_role: str = "") -> str:
-        """Построение системного промпта для ассистента Delёz."""
+        """Построение системного промпта для ассистента Impulse."""
         base = (
-            "Ты — Delёz, персональный ассистент для осознанного развития.\n"
+            "Ты — Impulse, персональный ассистент для осознанного развития.\n"
             "Ты работаешь как «бортовой журнал»: помогаешь пользователю фиксировать наблюдения, "
             "формулировать цели и раскладывать их на конкретные задачи.\n\n"
             "Твоя задача:\n"
@@ -509,7 +509,7 @@ class RAGChain(BaseChain):
         Генерация ответа с GigaChat (Pro/Max).
         
         Формат сообщений:
-        - System: Личность Delёz
+        - System: Личность Impulse
         - Assistant: История диалога (если есть)
         - User: Контекст RAG + текущий вопрос
         

@@ -25,7 +25,7 @@ def test_format_dialogue_and_parse_hints():
         ]
     )
     assert "Пользователь: Привет" in dialogue
-    assert "Delёz: Ответ" in dialogue
+    assert "Impulse: Ответ" in dialogue
 
     parsed = module._parse_hints("1) Первый\n- Второй")
     assert len(parsed) == 3

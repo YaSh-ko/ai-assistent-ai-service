@@ -1,4 +1,4 @@
-# Python AI Service (Delёz)
+# Python AI Service (Impulse)
 
 Интеллектуальный ассистент: RAG, гибридный поиск, граф знаний (Neo4j), детектор сущностей (event / goal / experiment).
 

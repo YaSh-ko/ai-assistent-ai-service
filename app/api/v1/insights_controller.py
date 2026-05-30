@@ -30,8 +30,9 @@ class EntityItem(BaseModel):
 
 class SummarizeRequest(BaseModel):
     entities: List[EntityItem]
-    context: str = Field(description="day_summary | cluster_analysis")
+    context: str = Field(description="day_summary | week_summary | cluster_analysis")
     date: Optional[str] = None
+    week_end: Optional[str] = None
 
 
 class SummarizeResponse(BaseModel):
@@ -47,6 +48,16 @@ _DAY_SYSTEM = """Ты — аналитик личного дневника ра�
 
 Пиши кратко (3-6 предложений), без заголовков и списков. Обращайся на «ты»."""
 
+_WEEK_SYSTEM = """Ты — аналитик личного дневника развития. Пользователь ведёт наблюдения, ставит цели и создаёт задачи.
+Тебе дан список сущностей за одну неделю. Напиши аналитическую сводку на русском языке:
+- Главные темы и повторяющиеся паттерны недели
+- Прогресс по целям и выполненным задачам
+- Динамика настроения и энергии (если видна из наблюдений)
+- Что получилось хорошо и где были сложности
+- 1–2 конкретных фокуса на следующую неделю
+
+Пиши связным текстом (5-8 предложений), без заголовков и маркированных списков. Обращайся на «ты»."""
+
 _CLUSTER_SYSTEM = """Ты — аналитик личного дневника развития. Тебе дан кластер связанных сущностей пользователя (наблюдения, цели, задачи), объединённых общей темой.
 
 Проанализируй этот кластер и напиши на русском:
@@ -58,8 +69,17 @@ _CLUSTER_SYSTEM = """Ты — аналитик личного дневника �
 Пиши кратко (4-7 предложений), без заголовков и маркированных списков. Обращайся на «ты»."""
 
 
-def _build_entities_block(entities: list[EntityItem], date: str | None = None) -> str:
-    header = f"Дата: {date}\n\n" if date else ""
+def _build_entities_block(
+    entities: list[EntityItem],
+    date: str | None = None,
+    week_end: str | None = None,
+) -> str:
+    if date and week_end:
+        header = f"Период недели: {date} — {week_end}\n\n"
+    elif date:
+        header = f"Дата: {date}\n\n"
+    else:
+        header = ""
     lines = []
     for e in entities:
         status_part = f" [{e.status}]" if e.status else ""
@@ -78,10 +98,12 @@ async def summarize_entities(
 
     if request.context == "day_summary":
         system = _DAY_SYSTEM
+    elif request.context == "week_summary":
+        system = _WEEK_SYSTEM
     else:
         system = _CLUSTER_SYSTEM
 
-    user_prompt = _build_entities_block(request.entities, request.date)
+    user_prompt = _build_entities_block(request.entities, request.date, request.week_end)
 
     logger.info(
         "[Insights] Generating %s for %d entities",
@@ -93,7 +115,7 @@ async def summarize_entities(
             prompt=user_prompt,
             model_name="gigachat",
             system_prompt=system,
-            max_tokens=500,
+            max_tokens=700 if request.context == "week_summary" else 500,
             temperature=0.7,
         )
         summary = response.content if hasattr(response, "content") else str(response)
