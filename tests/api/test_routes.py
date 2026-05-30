@@ -99,14 +99,6 @@ class TestRouterIntegration:
         # Verify runs router is included
         assert runs_router is not None
     
-    def test_router_includes_models(self):
-        """Test that models router is included"""
-        from app.api.routes import api_router
-        from app.api.models import router as models_router
-        
-        # Verify models router is included
-        assert models_router is not None
-    
     def test_router_includes_detector(self):
         """Test that detector router is included"""
         from app.api.routes import api_router

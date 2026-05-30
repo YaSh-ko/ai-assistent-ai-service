@@ -65,6 +65,7 @@ class SessionState(BaseModel):
     shelved: List[PendingCandidate] = Field(default_factory=list)
     chip_shown_for: Optional[str] = None
     chip_shown_action: Optional[str] = None
+    chip_shown_message_count: Optional[int] = None
     last_proposal: Optional[Dict[str, Any]] = None
     proposed_entities: List[ProposedEntity] = Field(default_factory=list)
     created_entities: List[CreatedEntity] = Field(default_factory=list)
@@ -168,12 +169,6 @@ class DetectorProposal(BaseModel):
     revived: bool = False
     existing_entity_id: Optional[str] = None
     existing_title: Optional[str] = None
-
-
-class DetectEntitiesRequest(BaseModel):
-    thread_id: str
-    messages: List[Dict[str, Any]]
-    context: DetectorContext = Field(default_factory=DetectorContext)
 
 
 class DeclineProposalRequest(BaseModel):

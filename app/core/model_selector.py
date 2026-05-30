@@ -52,7 +52,7 @@ class ModelSelector:
         
         model_name = result.suggested_model
         if prefer_privacy:
-            model_name = "vllm"
+            model_name = "gigachat"
             
         return ModelFactory.get_model(model_name)
 
@@ -66,8 +66,8 @@ class ModelSelector:
         reason = complexity.reasoning
         
         if prefer_privacy:
-            model_name = "vllm"
-            reason = "Пользователь предпочел приватность, используем локальную модель."
+            model_name = "gigachat"
+            reason = "Пользователь предпочел приватность, используем базовую модель GigaChat."
             
         return ModelSelectionResult(
             model_name=model_name,

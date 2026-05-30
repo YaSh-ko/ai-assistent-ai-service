@@ -18,12 +18,18 @@ SIMILARITY_THRESHOLD = 0.75
 MAX_RESULTS = 5
 _INDEX_TTL_SECONDS = 15
 
+_FETCH_ALL_ENTITY_IDS_SQL = """
+SELECT id::text FROM public.entries WHERE user_id = $1
+UNION ALL
+SELECT id::text FROM public.goals WHERE user_id = $1
+UNION ALL
+SELECT id::text FROM public.experiments WHERE user_id = $1
+"""
+
 _FETCH_ENTITIES_SQL = """
 (SELECT id::text, 'observation' AS entity_type, title, description, 'active' AS status
  FROM public.entries
- WHERE user_id = $1
- ORDER BY created_at DESC
- LIMIT 50)
+ WHERE user_id = $1)
 
 UNION ALL
 
@@ -117,13 +123,47 @@ class EntityIndexService:
 
     async def _ensure_indexed(self, user_id: str) -> None:
         """Lazy-index: fetch all user entities from PG, embed, upsert into ChromaDB."""
+        await self._db._ensure_connection()
+
+        async with PostgresProvider._query_lock:
+            pg_id_rows = await self._db.pool.fetch(_FETCH_ALL_ENTITY_IDS_SQL, user_id)
+        pg_ids = {r["id"] for r in pg_id_rows}
+
+        existing_ids: set[str] = set()
+        try:
+            existing = self._collection.get(
+                where={"user_id": user_id},
+                include=[],
+            )
+            existing_ids = set(existing["ids"]) if existing["ids"] else set()
+        except Exception as e:
+            logger.warning("[EntityIndex] ChromaDB get failed (will re-index all): %s", e)
+
+        stale_ids = existing_ids - pg_ids
+        if stale_ids:
+            logger.info(
+                "[EntityIndex] Removing %d stale entries from ChromaDB (deleted from PG)",
+                len(stale_ids),
+            )
+            self._collection.delete(ids=list(stale_ids))
+            existing_ids -= stale_ids
+
+        missing_ids = pg_ids - existing_ids
         last_indexed = self._indexed_users.get(user_id, 0)
-        if time.time() - last_indexed < _INDEX_TTL_SECONDS:
-            logger.debug("[EntityIndex] User %s indexed %.0fs ago (TTL %ds), skipping", user_id, time.time() - last_indexed, _INDEX_TTL_SECONDS)
+        if not missing_ids and time.time() - last_indexed < _INDEX_TTL_SECONDS:
+            logger.debug(
+                "[EntityIndex] User %s indexed %.0fs ago (TTL %ds), skipping",
+                user_id, time.time() - last_indexed, _INDEX_TTL_SECONDS,
+            )
             return
 
-        logger.info("[EntityIndex] === Starting indexing for user %s ===", user_id)
-        await self._db._ensure_connection()
+        if missing_ids:
+            logger.info(
+                "[EntityIndex] %d entities missing from ChromaDB for user %s, indexing",
+                len(missing_ids), user_id,
+            )
+        else:
+            logger.info("[EntityIndex] === Starting indexing for user %s ===", user_id)
 
         async with PostgresProvider._query_lock:
             rows = await self._db.pool.fetch(_FETCH_ENTITIES_SQL, user_id)
@@ -141,25 +181,7 @@ class EntityIndexService:
             self._indexed_users[user_id] = time.time()
             return
 
-        existing_ids = set()
-        try:
-            existing = self._collection.get(
-                where={"user_id": user_id},
-                include=[],
-            )
-            existing_ids = set(existing["ids"]) if existing["ids"] else set()
-            logger.info("[EntityIndex] ChromaDB already has %d entities for user %s", len(existing_ids), user_id)
-        except Exception as e:
-            logger.warning("[EntityIndex] ChromaDB get failed (will re-index all): %s", e)
-
-        pg_ids = set(r["id"] for r in rows)
-        stale_ids = existing_ids - pg_ids
-        if stale_ids:
-            logger.info(
-                "[EntityIndex] Removing %d stale entries from ChromaDB (deleted from PG)",
-                len(stale_ids),
-            )
-            self._collection.delete(ids=list(stale_ids))
+        logger.info("[EntityIndex] ChromaDB has %d entities for user %s", len(existing_ids), user_id)
 
         new_rows = [r for r in rows if r["id"] not in existing_ids]
         if not new_rows:

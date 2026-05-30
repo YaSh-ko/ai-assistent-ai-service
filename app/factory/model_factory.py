@@ -11,7 +11,6 @@ from app.interfaces.model_provider import (
     ModelError,
     ModelUnavailableError
 )
-from app.providers.models.vllm_provider import VLLMProvider
 from app.providers.models.gigachat_provider import GigaChatProvider
 from app.core.config import settings
 from app.monitoring.logger import get_logger
@@ -34,7 +33,6 @@ class ModelFactory:
         "gigachat",
         "gigachat_pro",
         "gigachat_max",
-        "vllm"
     ]
     
     # Текущая активная модель
@@ -46,7 +44,7 @@ class ModelFactory:
         Получить провайдер модели по имени.
         
         Args:
-            model_name: Имя модели (vllm, gigachat, gigachat_pro, gigachat_max)
+            model_name: Имя модели (gigachat, gigachat_pro, gigachat_max)
                        Если None, используется текущая модель из настроек
         
         Returns:
@@ -79,15 +77,7 @@ class ModelFactory:
         """Создание провайдера по имени модели."""
         logger.info(f"Creating provider for model: {model_name}")
         
-        if model_name == "vllm":
-            return VLLMProvider(
-                base_url=settings.VLLM_CONFIG.get("base_url"),
-                model_name=settings.VLLM_CONFIG.get("model_name"),
-                temperature=settings.VLLM_CONFIG.get("temperature", 0.7),
-                max_tokens=settings.VLLM_CONFIG.get("max_tokens", 2000)
-            )
-        
-        elif model_name == "gigachat" or model_name == "gigachat_base":
+        if model_name == "gigachat" or model_name == "gigachat_base":
             return GigaChatProvider(
                 version="base",
                 credentials=settings.GIGACHAT_CREDENTIALS,
@@ -168,7 +158,7 @@ class ModelFactory:
     @classmethod
     def get_available_models(cls) -> List[str]:
         """Получить список доступных моделей."""
-        return ["vllm", "gigachat", "gigachat_pro", "gigachat_max"]
+        return ["gigachat", "gigachat_pro", "gigachat_max"]
     
     @classmethod
     async def check_availability(cls) -> Dict[str, bool]:

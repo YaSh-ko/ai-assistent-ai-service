@@ -57,13 +57,18 @@ _SYSTEM_PROMPT = """Ты — аналитический агент систем�
       "fields": {
         "description": "Развёрнутое описание из контекста диалога (2-4 предложения)",
         "event_date": "YYYY-MM-DD или null (дата когда произошло/замечено)",
-        "area": "область жизни: career|health|skills|relationships|finance|personal|other"
+        "area": "область жизни: career|health|skills|relationships|finance|personal|other",
+        "valence": -0.4
       }
     }
   ],
   "same_topic_as_pending": false,
   "updates": []
 }
+
+Для observation в fields обязательно укажи valence — эмоциональный тон переживания от -1.0 до 1.0:
+-1.0 = очень тяжело, стресс, провал; 0 = нейтрально; +1.0 = облегчение, радость, успех.
+При update observation тоже укажи valence для НОВОГО фрагмента из последнего сообщения.
 
 Формат — Цель (goal):
 {
@@ -101,7 +106,7 @@ _SYSTEM_PROMPT = """Ты — аналитический агент систем�
   "type": "goal", "confidence": 0.85, "action": "update",
   "existing_entity_id": "uuid-of-existing-goal",
   "title": "Исходное название цели",
-  "fields": {"description": "Дополненное описание с новой информацией из диалога"}
+  "fields": {"description": "Дополненное описание с новой информацией из диалога", "valence": 0.3}
 }
 
 Если ничего не обнаружено: {"entities": [], "same_topic_as_pending": false, "updates": []}

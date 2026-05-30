@@ -210,14 +210,13 @@ class TestModelSelectorComplexity:
         assert provider.name == "gigachat_max"
     
     def test_select_model_privacy_preference(self):
-        """prefer_privacy=True → всегда vLLM."""
-        # Даже для сложного запроса при prefer_privacy=True используем vLLM
+        """prefer_privacy=True → базовая GigaChat модель."""
         provider = ModelSelector.select_model(
             "Проанализируй мои записи за год и найди паттерны",
-            prefer_privacy=True
+            prefer_privacy=True,
         )
-        
-        assert provider.name == "vllm"
+
+        assert provider.name == "gigachat"
     
     def test_select_model_speed_preference_simple(self):
         """prefer_speed=True + простой запрос → модель для simple."""
@@ -274,7 +273,7 @@ class TestModelSelectorWithDetails:
         )
         
         assert "приватност" in result.reason.lower()
-        assert result.model_name == "vllm"
+        assert result.model_name == "gigachat"
 
 
 class TestModelSelectorLegacy:

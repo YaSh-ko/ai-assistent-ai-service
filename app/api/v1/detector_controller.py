@@ -10,12 +10,9 @@ from pydantic import BaseModel, Field
 from app.api.deps import get_detector_service, get_entity_index, get_session_manager
 from app.models.detector import (
     DeclineProposalRequest,
-    DetectEntitiesRequest,
     DetectorProposal,
-    DetectorResult,
 )
-from app.services.detector_agent import DetectorAgent
-from app.services.detector_service import DetectorService, load_session_state
+from app.services.detector_service import DetectorService
 from app.services.entity_index_service import EntityIndexService
 from app.services.session_manager import SessionManager
 
@@ -42,31 +39,6 @@ class SimilarEntityItem(BaseModel):
 
 class SimilarEntitiesResponse(BaseModel):
     items: List[SimilarEntityItem]
-
-_detector_agent = DetectorAgent()
-
-
-@router.post("/detect-entities", response_model=DetectorResult)
-async def detect_entities(
-    request: DetectEntitiesRequest,
-    session_manager: SessionManager = Depends(get_session_manager),
-) -> DetectorResult:
-    """
-    Analyse recent chat messages and detect entity candidates.
-    Used for manual/debug calls; production flow uses run_after_turn in the chat stream.
-    """
-    session = await session_manager.get_session(request.thread_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    state = load_session_state(session.context or {})
-    ctx = request.context.model_copy(update={"session_state": state})
-
-    return await _detector_agent.detect(
-        thread_id=request.thread_id,
-        messages=request.messages,
-        context=ctx,
-    )
 
 
 @router.post("/detector/run/{thread_id}", response_model=Optional[DetectorProposal])

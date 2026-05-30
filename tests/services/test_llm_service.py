@@ -23,8 +23,7 @@ def _mock_response(content="answer", tokens=10):
 @pytest.fixture
 def service():
     with patch("app.services.llm_service.ModelMetrics"), \
-         patch("app.services.llm_service.ContextService") as MockCtx, \
-         patch("app.services.llm_service.SessionService"):
+         patch("app.services.llm_service.ContextService") as MockCtx:
         ctx = MagicMock()
         ctx.format_context = MagicMock(return_value="[context]")
         MockCtx.return_value = ctx

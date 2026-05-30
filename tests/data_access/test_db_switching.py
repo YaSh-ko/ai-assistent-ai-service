@@ -21,7 +21,7 @@ async def test_create_dal_postgres():
                 dal = await DatabaseFactory.create_dal_async()
                 
                 assert dal is not None
-                assert dal.session_repo is not None
+                assert dal.chat_session_repo is not None
                 # Check that it's using the mocked pool
                 # Since we can't easily check the internal pool of the repo without accessing it,
                 # we assume if it didn't crash, it worked.

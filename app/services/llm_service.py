@@ -14,7 +14,6 @@ from app.interfaces.model_provider import (
     ModelError
 )
 from app.services.context_service import ContextService
-from app.services.session_service import SessionService
 from app.monitoring.logger import get_logger
 from app.monitoring.metrics import ModelMetrics
 from app.services.billing import billing_service
@@ -31,17 +30,14 @@ class LLMService:
     def __init__(
         self,
         context_service: Optional[ContextService] = None,
-        session_service: Optional[SessionService] = None
     ):
         """
         Инициализация LLM сервиса.
-        
+
         Args:
             context_service: Сервис для работы с контекстом
-            session_service: Сервис для работы с сессиями
         """
         self._context_service = context_service or ContextService()
-        self._session_service = session_service
         self._metrics = ModelMetrics()
     
     async def generate_response(

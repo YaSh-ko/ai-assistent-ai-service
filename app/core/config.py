@@ -43,27 +43,13 @@ class Settings(BaseSettings):
         "complex": "gigachat_max",
     }
     
-    # Маппинг сложности запросов на модели
-    # simple -> vLLM (локально): приватность, скорость, простые вопросы
-    # medium -> GigaChat Pro (API): анализ, начало дневника
-    # complex -> GigaChat Max (API): паттерны, глубокий анализ
+    # Маппинг сложности запросов на модели GigaChat
     MODEL_COMPLEXITY_MAP: Dict[str, str] = {
-        "simple": "gigachat",       # GigaChat Base API (was vllm)
-        "medium": "gigachat_pro",   # GigaChat Pro API
-        "complex": "gigachat_max",  # GigaChat Max API
+        "simple": "gigachat",
+        "medium": "gigachat_pro",
+        "complex": "gigachat_max",
     }
 
-    
-    # VLLM Configuration
-    VLLM_CONFIG: Dict[str, Any] = {
-        "base_url": os.getenv("VLLM_API_URL", "http://localhost:8000/v1"),
-        "model_name": os.getenv("VLLM_MODEL_NAME", "local-model"),
-        "temperature": float(os.getenv("VLLM_TEMPERATURE", "0.7")),
-        "max_tokens": int(os.getenv("VLLM_MAX_TOKENS", "2000")),
-        "top_p": float(os.getenv("VLLM_TOP_P", "0.9")),
-        "timeout": int(os.getenv("VLLM_TIMEOUT", "60")),
-        "retry_attempts": int(os.getenv("VLLM_RETRY_ATTEMPTS", "3")),
-    }
     
     # GigaChat Base Configuration
     GIGACHAT_BASE_CONFIG: Dict[str, Any] = {
@@ -142,8 +128,6 @@ class Settings(BaseSettings):
             self.GIGACHAT_CLIENT_ID = self.GIGACHAT_CLIENT_ID.strip()
         if self.GIGACHAT_CLIENT_SECRET:
             self.GIGACHAT_CLIENT_SECRET = self.GIGACHAT_CLIENT_SECRET.strip()
-        if self.VLLM_API_KEY:
-            self.VLLM_API_KEY = self.VLLM_API_KEY.strip()
         if self.LANGGRAPH_SERVER_CONFIG and self.LANGGRAPH_SERVER_CONFIG.get("api_key"):
             self.LANGGRAPH_SERVER_CONFIG["api_key"] = self.LANGGRAPH_SERVER_CONFIG["api_key"].strip()
         return self
@@ -151,7 +135,6 @@ class Settings(BaseSettings):
     # Session Config
     SESSION_CONFIG: Dict[str, Any] = {
         "ttl": 3600,  # 1 hour
-        "cache_provider": "redis",
     }
 
     # LangGraph Server Config
@@ -174,21 +157,12 @@ class Settings(BaseSettings):
     NEO4J_URI: str = ""
     NEO4J_USERNAME: str = ""
     NEO4J_PASSWORD: str = ""
-    REDIS_URL: str = ""
     CHROMA_SERVER_HOST: str = ""
     CHROMA_SERVER_PORT: int = 8001
     CHROMA_SERVER_SSL: bool = True
     CHROMA_DB_PATH: str = "./chroma_db"
-    
-    # Milvus Configuration
-    MILVUS_HOST: str = ""
-    MILVUS_PORT: int = 19530
-    MILVUS_USER: str = ""
-    MILVUS_PASSWORD: str = ""
-    MILVUS_COLLECTION: str = ""
-    
-    # Vector Store Selection
-    VECTOR_STORE_TYPE: str = "chroma"  # Options: "chroma", "milvus"
+
+    VECTOR_STORE_TYPE: str = "chroma"
     
     DATABASE_TYPE: str = "postgres"
 
@@ -235,9 +209,6 @@ class Settings(BaseSettings):
     GIGACHAT_CLIENT_ID: str = ""
     GIGACHAT_CLIENT_SECRET: str = ""
     GIGACHAT_SCOPE: str = "GIGACHAT_API_PERS"
-    VLLM_API_URL: str = "http://localhost:8000/v1"
-    VLLM_MODEL_NAME: str = "local-model"
-    VLLM_API_KEY: str = ""
 
     # =================================
     # LLM EVAL CONFIG
@@ -275,11 +246,6 @@ class Settings(BaseSettings):
             "chroma_host": self.CHROMA_SERVER_HOST,
             "chroma_port": self.CHROMA_SERVER_PORT,
             "chroma_ssl": self.CHROMA_SERVER_SSL,
-            "milvus_host": self.MILVUS_HOST,
-            "milvus_port": self.MILVUS_PORT,
-            "milvus_user": self.MILVUS_USER,
-            "milvus_password": self.MILVUS_PASSWORD,
-            "milvus_collection": self.MILVUS_COLLECTION,
         }
 
         # Parse DATABASE_URL if provided
@@ -302,13 +268,12 @@ class Settings(BaseSettings):
         Получить конфигурацию для указанной модели.
         
         Args:
-            model_name: Имя модели (vllm, gigachat, gigachat_pro, gigachat_max)
+            model_name: Имя модели (gigachat, gigachat_pro, gigachat_max)
             
         Returns:
             Словарь с конфигурацией модели
         """
         configs = {
-            "vllm": self.VLLM_CONFIG,
             "gigachat": self.GIGACHAT_BASE_CONFIG,
             "gigachat_base": self.GIGACHAT_BASE_CONFIG,
             "gigachat_pro": self.GIGACHAT_PRO_CONFIG,
@@ -318,7 +283,7 @@ class Settings(BaseSettings):
     
     def get_available_models(self) -> List[str]:
         """Получить список доступных моделей."""
-        return ["vllm", "gigachat", "gigachat_pro", "gigachat_max"]
+        return ["gigachat", "gigachat_pro", "gigachat_max"]
 
 
 settings = Settings()

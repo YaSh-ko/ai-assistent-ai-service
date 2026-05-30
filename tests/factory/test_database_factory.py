@@ -12,12 +12,10 @@ def reset_factory():
     DatabaseFactory._neo4j_instance = None
     DatabaseFactory._postgres_instance = None
     DatabaseFactory._chroma_instance = None
-    DatabaseFactory._milvus_instance = None
     yield
     DatabaseFactory._neo4j_instance = None
     DatabaseFactory._postgres_instance = None
     DatabaseFactory._chroma_instance = None
-    DatabaseFactory._milvus_instance = None
 
 
 class TestCreateRelationalDatabase:
@@ -111,18 +109,6 @@ class TestCreateVectorStore:
             s.DATABASE_CONFIG = {}
             s.VECTOR_STORE_TYPE = "chroma"
             result = DatabaseFactory.create_vector_store("chroma")
-
-        assert result is mock_provider
-
-    def test_creates_milvus_provider(self):
-        from app.factory.database_factory import DatabaseFactory
-
-        mock_provider = MagicMock()
-        with patch("app.factory.database_factory.MilvusProvider", return_value=mock_provider), \
-             patch("app.core.config.settings") as s:
-            s.DATABASE_CONFIG = {}
-            s.VECTOR_STORE_TYPE = "milvus"
-            result = DatabaseFactory.create_vector_store("milvus")
 
         assert result is mock_provider
 

@@ -2,6 +2,7 @@
 Orchestrates detector agent + session state persistence.
 """
 import logging
+import string
 from typing import Any, Dict, List, Optional
 
 from app.models.detector import (
@@ -18,10 +19,131 @@ from app.services.session_manager import SessionManager
 logger = logging.getLogger(__name__)
 
 
-_COMMON_WORDS = frozenset({
-    "очень", "хочу", "хотел", "бы", "как", "что", "это", "для", "меня",
-    "себя", "мне", "было", "буду", "нужно", "надо", "лету", "летом",
+# Ignored when tokenizing user text for stale-entity check (title/description overlap).
+# Function words that appear in almost any message and must not count as a topic match.
+_STOPWORDS = frozenset({
+    "очень", "просто", "уже", "ещё", "еще", "тоже", "также", "вообще", "снова",
+    "меня", "мне", "себя", "свой", "свою", "своё", "свои", "нам", "нас", "ему",
+    "это", "что", "как", "для", "при", "про", "без", "над", "под", "или", "если",
+    "бы", "ли", "же", "нет", "да", "не", "ни",
+    "было", "была", "были", "буду", "есть", "был", "быть",
+    "нужно", "надо", "можно", "нельзя",
+    "там", "тут", "где", "когда", "тогда", "потом", "сейчас", "сегодня", "вчера",
 })
+
+_UPDATE_SCORE_THRESHOLD = 0.82
+_UPDATE_STRONG_SCORE = 0.88
+_PUNCT = string.punctuation + "«»—…"
+
+
+def _tokenize_user_message(text: str) -> List[str]:
+    """Split user text into tokens, stripping punctuation (сну, → сну)."""
+    tokens: List[str] = []
+    for word in text.lower().split():
+        cleaned = word.strip(_PUNCT)
+        if len(cleaned) > 2 and cleaned not in _STOPWORDS:
+            tokens.append(cleaned)
+    return tokens
+
+
+def _titles_similar(a: str, b: str) -> bool:
+    na, nb = a.lower().strip(), b.lower().strip()
+    if not na or not nb:
+        return False
+    if na == nb or na in nb or nb in na:
+        return True
+    wa, wb = na.split()[:4], nb.split()[:4]
+    return len(wa) >= 2 and wa == wb
+
+
+def _user_message_relates_to_pg_entity(
+    existing_title: str,
+    last_user_text: str,
+    *,
+    existing_description: str = "",
+) -> bool:
+    """True when the user's message plausibly continues an existing PG entity (not just a fuzzy embedding)."""
+    combined = f"{existing_title} {existing_description}".lower().strip()
+    user = last_user_text.lower()
+    user_tokens = _tokenize_user_message(user)
+    if not combined or not user_tokens:
+        return False
+    if any(w in combined for w in user_tokens):
+        return True
+    if len(combined) >= 4 and combined[:4] in user:
+        return True
+    title_words = [
+        w.strip(_PUNCT)
+        for w in combined.split()
+        if len(w.strip(_PUNCT)) > 2
+    ]
+    for w in user_tokens:
+        if len(w) >= 3 and w[:3] in combined:
+            return True
+        if len(w) >= 3:
+            for tw in title_words:
+                if len(tw) >= 3 and w[:2] == tw[:2] and w[:2] not in {"по", "на", "не", "ни", "от", "до", "из", "за", "при"}:
+                    return True
+    return False
+
+
+def apply_existing_entity_update(
+    entity: DetectedEntity,
+    existing_entities: Optional[List[Dict[str, Any]]],
+    last_user_text: str,
+) -> DetectedEntity:
+    """
+    Prefer update over duplicate when semantic search finds a strong match.
+    LLM often returns action=create even when existing_entity_id is in the prompt.
+    """
+    if entity.action == "update" and entity.existing_entity_id:
+        if entity.type == "observation" and last_user_text.strip():
+            fields = dict(entity.fields or {})
+            fields["description"] = last_user_text.strip()
+            return entity.model_copy(update={"fields": fields})
+        return entity
+    if not existing_entities:
+        return entity
+
+    typed = [e for e in existing_entities if e.get("entity_type") == entity.type]
+    if not typed:
+        return entity
+
+    top = typed[0]
+    score = float(top.get("score", 0))
+    existing_id = top.get("entity_id")
+    existing_title = top.get("title") or ""
+    existing_description = top.get("description") or ""
+    if score < _UPDATE_SCORE_THRESHOLD or not existing_id:
+        return entity
+
+    relates = _user_message_relates_to_pg_entity(
+        existing_title, last_user_text, existing_description=existing_description,
+    )
+    titles_align = _titles_similar(entity.title or "", existing_title)
+    strong_match = score >= _UPDATE_STRONG_SCORE and (relates or titles_align)
+    moderate_match = score >= _UPDATE_SCORE_THRESHOLD and relates
+
+    if not (strong_match or moderate_match):
+        logger.info(
+            "[DetectorService] Keeping create: semantic score=%.3f but message doesn't relate to %r",
+            score, existing_title[:50],
+        )
+        return entity
+
+    logger.info(
+        "[DetectorService] Auto-converting to update: type=%s existing_id=%s score=%.3f relates=%s title=%r",
+        entity.type, str(existing_id)[:12], score, relates, existing_title[:50],
+    )
+    merged_fields = dict(entity.fields or {})
+    note_text = last_user_text.strip() or merged_fields.get("description") or entity.description or ""
+    return entity.model_copy(update={
+        "action": "update",
+        "existing_entity_id": existing_id,
+        "existing_title": existing_title,
+        "title": existing_title or entity.title,
+        "fields": {**merged_fields, "description": note_text},
+    })
 
 
 def trim_messages_to_last_turn(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -43,8 +165,7 @@ def entity_matches_last_user_message(entity: DetectedEntity, last_user_text: str
     title = (entity.title or entity.name or "").lower()
     desc = (entity.description or (entity.fields or {}).get("description") or "").lower()
     user = last_user_text.lower()
-
-    user_tokens = [w for w in user.split() if len(w) > 2 and w not in _COMMON_WORDS]
+    user_tokens = _tokenize_user_message(user)
     if not user_tokens:
         return True
 
@@ -54,7 +175,9 @@ def entity_matches_last_user_message(entity: DetectedEntity, last_user_text: str
         return True
 
     # Substring overlap for inflected Russian (руках / руки / рука)
-    if len(title) >= 4 and any(title[:4] in user or user_word[:4] in title for user_word in user_tokens):
+    if len(title) >= 4 and any(
+        title[:4] in user or user_word[:4] in title for user_word in user_tokens
+    ):
         return True
 
     logger.warning(
@@ -295,6 +418,12 @@ class DetectorService:
                 "[DetectorService] thread=%s ALL %d entities rejected as stale",
                 thread_id, len(detection.entities),
             )
+        if existing_entities and last_user_text:
+            filtered_entities = [
+                apply_existing_entity_update(e, existing_entities, last_user_text)
+                for e in filtered_entities
+            ]
+
         if not context.is_goal_context:
             filtered_entities = [e for e in filtered_entities if e.type != "task"]
         elif context.entity_id:

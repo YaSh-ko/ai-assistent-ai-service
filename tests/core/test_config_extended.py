@@ -41,22 +41,6 @@ class TestSettingsBasic:
         assert s.MODEL_COMPLEXITY_MAP["complex"] == "gigachat_max"
 
 
-class TestVLLMConfig:
-    """Tests for VLLM configuration"""
-    
-    @patch.dict(os.environ, {}, clear=True)
-    def test_vllm_default_config(self):
-        """Test VLLM default configuration"""
-        from app.core.config import Settings
-        s = Settings(_env_file=None)
-        assert "base_url" in s.VLLM_CONFIG
-        assert "model_name" in s.VLLM_CONFIG
-        assert "temperature" in s.VLLM_CONFIG
-        assert "max_tokens" in s.VLLM_CONFIG
-        assert isinstance(s.VLLM_CONFIG["temperature"], float)
-        assert isinstance(s.VLLM_CONFIG["max_tokens"], int)
-
-
 class TestGigaChatConfig:
     """Tests for GigaChat configuration"""
     
@@ -176,17 +160,6 @@ class TestSensitiveFieldsValidation:
         assert s.GIGACHAT_CLIENT_SECRET == "secret"
     
     @patch.dict(os.environ, {}, clear=True)
-    def test_strip_vllm_api_key(self):
-        """Test stripping whitespace from VLLM API key"""
-        from app.core.config import Settings
-        s = Settings(_env_file=None)
-        s.VLLM_API_KEY = "  api_key  "
-        
-        s = s.validate_sensitive_fields()
-        
-        assert s.VLLM_API_KEY == "api_key"
-    
-    @patch.dict(os.environ, {}, clear=True)
     def test_strip_langgraph_api_key(self):
         """Test stripping whitespace from LangGraph API key"""
         from app.core.config import Settings
@@ -246,22 +219,6 @@ class TestDatabaseConfig:
         assert config["user"] == "user"
         assert config["password"] == "pass"
     
-    @patch.dict(os.environ, {}, clear=True)
-    def test_milvus_config(self):
-        """Test Milvus configuration"""
-        from app.core.config import Settings
-        s = Settings(_env_file=None)
-        s.MILVUS_HOST = "localhost"
-        s.MILVUS_PORT = 19530
-        s.MILVUS_COLLECTION = "test_collection"
-        
-        config = s.DATABASE_CONFIG
-        
-        assert config["milvus_host"] == "localhost"
-        assert config["milvus_port"] == 19530
-        assert config["milvus_collection"] == "test_collection"
-
-
 class TestCOTConfig:
     """Tests for Chain-of-Thought configuration"""
     
@@ -322,14 +279,6 @@ class TestModelConfigMethods:
     """Tests for model configuration methods"""
     
     @patch.dict(os.environ, {}, clear=True)
-    def test_get_model_config_vllm(self):
-        """Test getting VLLM model config"""
-        from app.core.config import Settings
-        s = Settings(_env_file=None)
-        config = s.get_model_config("vllm")
-        assert config == s.VLLM_CONFIG
-    
-    @patch.dict(os.environ, {}, clear=True)
     def test_get_model_config_gigachat(self):
         """Test getting GigaChat model config"""
         from app.core.config import Settings
@@ -375,11 +324,10 @@ class TestModelConfigMethods:
         from app.core.config import Settings
         s = Settings(_env_file=None)
         models = s.get_available_models()
-        assert "vllm" in models
         assert "gigachat" in models
         assert "gigachat_pro" in models
         assert "gigachat_max" in models
-        assert len(models) == 4
+        assert len(models) == 3
 
 
 class TestSessionConfig:
@@ -391,7 +339,6 @@ class TestSessionConfig:
         from app.core.config import Settings
         s = Settings(_env_file=None)
         assert s.SESSION_CONFIG["ttl"] == 3600
-        assert s.SESSION_CONFIG["cache_provider"] == "redis"
 
 
 class TestLangGraphConfig:
@@ -416,15 +363,6 @@ class TestProviderConfigs:
         s = Settings(_env_file=None)
         assert s.GIGACHAT_SCOPE == "GIGACHAT_API_PERS"
     
-    @patch.dict(os.environ, {}, clear=True)
-    def test_vllm_provider_config(self):
-        """Test VLLM provider configuration"""
-        from app.core.config import Settings
-        s = Settings(_env_file=None)
-        assert s.VLLM_API_URL == "http://localhost:8000/v1"
-        assert s.VLLM_MODEL_NAME == "local-model"
-
-
 class TestSettingsSingleton:
     """Tests for settings singleton"""
     

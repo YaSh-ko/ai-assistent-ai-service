@@ -19,8 +19,6 @@ class ReasoningFactory:
                 cls._instances[engine_type] = cls.create_cot_provider()
             elif engine_type == "reflection":
                 cls._instances[engine_type] = cls.create_reflection_provider()
-            # elif engine_type == "mcp_thinking":
-            #     cls._instances[engine_type] = cls.create_mcp_thinking_provider()
             else:
                 raise ValueError(f"Unknown reasoning engine type: {engine_type}")
         

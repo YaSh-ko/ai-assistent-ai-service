@@ -19,7 +19,6 @@ from app.interfaces.model_provider import (
 from app.factory.model_factory import ModelFactory
 from app.services.llm_service import LLMService
 from app.providers.models.gigachat_provider import GigaChatProvider
-from app.providers.models.vllm_provider import VLLMProvider
 
 
 # ============================================
@@ -195,7 +194,6 @@ class TestModelFactory:
         """Тест получения списка доступных моделей."""
         models = ModelFactory.get_available_models()
         
-        assert "vllm" in models
         assert "gigachat" in models
         assert "gigachat_pro" in models
         assert "gigachat_max" in models
@@ -206,13 +204,6 @@ class TestModelFactory:
         
         assert provider is not None
         assert isinstance(provider, GigaChatProvider)
-    
-    def test_get_model_vllm(self):
-        """Тест создания VLLM провайдера."""
-        provider = ModelFactory.get_model("vllm")
-        
-        assert provider is not None
-        assert isinstance(provider, VLLMProvider)
     
     def test_get_model_caching(self):
         """Тест кеширования провайдеров."""
@@ -344,31 +335,6 @@ class TestGigaChatProvider:
         assert config.max_tokens == 2000
 
 
-class TestVLLMProvider:
-    """Тесты для VLLMProvider."""
-    
-    def test_provider_creation(self):
-        """Тест создания провайдера."""
-        provider = VLLMProvider()
-        
-        assert provider.name == "vllm"
-    
-    def test_provider_with_custom_url(self):
-        """Тест создания с кастомным URL."""
-        provider = VLLMProvider(base_url="http://custom:8080/v1")
-        
-        assert provider._base_url == "http://custom:8080/v1"
-    
-    def test_set_parameters(self):
-        """Тест изменения параметров."""
-        provider = VLLMProvider()
-        provider.set_parameters(temperature=0.5, max_tokens=500)
-        
-        config = provider.get_config()
-        assert config.temperature == 0.5
-        assert config.max_tokens == 500
-
-
 # ============================================
 # Integration Tests (mocked)
 # ============================================
@@ -423,7 +389,6 @@ class TestModelComparison:
             GigaChatProvider(version="base"),
             GigaChatProvider(version="pro"),
             GigaChatProvider(version="max"),
-            VLLMProvider()
         ]
         
         for provider in providers:
@@ -442,7 +407,6 @@ class TestModelComparison:
             GigaChatProvider(version="base"),
             GigaChatProvider(version="pro"),
             GigaChatProvider(version="max"),
-            VLLMProvider()
         ]
         
         for provider in providers:

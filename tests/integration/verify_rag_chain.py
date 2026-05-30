@@ -67,12 +67,9 @@ async def main():
         dal = await DatabaseFactory.create_dal_async()
         
         # Repositories (access from DAL)
-        session_repo = dal.session_repo
+        chat_session_repo = dal.chat_session_repo
         entry_repo = dal.entry_repo
         entry_thread_repo = dal.entry_thread_repo
-        goal_thread_repo = dal.goal_thread_repo
-        experiment_thread_repo = dal.experiment_thread_repo
-        analysis_thread_repo = dal.analysis_thread_repo
         embedding_repo = dal.embedding_repo
         
         # Vector Store (Chroma) - accessed via embedding_repo or factory

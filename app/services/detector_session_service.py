@@ -43,6 +43,16 @@ def _entity_display_title(entity: DetectedEntity) -> str:
     return (entity.title or entity.name or "").strip()
 
 
+def _normalize_valence(raw: object) -> Optional[float]:
+    if raw is None:
+        return None
+    try:
+        v = float(raw)
+    except (TypeError, ValueError):
+        return None
+    return max(-1.0, min(1.0, round(v, 3)))
+
+
 def _entity_fields(entity: DetectedEntity) -> dict:
     fields: dict = dict(entity.fields or {})
     if entity.description and "description" not in fields:
@@ -57,6 +67,10 @@ def _entity_fields(entity: DetectedEntity) -> dict:
         fields["measurable"] = entity.measurable
     if entity.area:
         fields["area"] = entity.area
+    if entity.type == "observation":
+        v = _normalize_valence((entity.fields or {}).get("valence"))
+        if v is not None:
+            fields["valence"] = v
     if entity.type == "goal" and "status" not in fields:
         fields["status"] = "active"
     if entity.type == "task" and "status" not in fields:
@@ -197,14 +211,16 @@ class DetectorSessionService:
 
         if not self._should_emit_chip(state, revived=revived, topic_switch=topic_switch):
             logger.info(
-                "[DetectorSession] Chip suppressed: id=%s already shown (chip_shown_for=%s, action=%s, shown_action=%s)",
+                "[DetectorSession] Chip suppressed: id=%s already shown (chip_shown_for=%s, action=%s, shown_action=%s, msg_count=%s shown_at=%s)",
                 state.active.id, state.chip_shown_for,
                 state.active.action, state.chip_shown_action,
+                state.active.message_count, state.chip_shown_message_count,
             )
             return state, None
 
         state.chip_shown_for = state.active.id
         state.chip_shown_action = state.active.action or "create"
+        state.chip_shown_message_count = state.active.message_count
         is_update = state.active.action == "update" and state.active.existing_entity_id
         proposal = DetectorProposal(
             show_chip=True,
@@ -250,12 +266,14 @@ class DetectorSessionService:
             if state.chip_shown_for == pending_id:
                 state.chip_shown_for = None
                 state.chip_shown_action = None
+                state.chip_shown_message_count = None
         elif state.active:
             declined_title = declined_title or state.active.title
             declined_type = state.active.type
             if state.chip_shown_for == state.active.id:
                 state.chip_shown_for = None
                 state.chip_shown_action = None
+                state.chip_shown_message_count = None
             state.active = None
 
         if declined_title:
@@ -287,6 +305,7 @@ class DetectorSessionService:
             state.shelved = [s for s in state.shelved if s.id != pid]
         state.chip_shown_for = None
         state.chip_shown_action = None
+        state.chip_shown_message_count = None
         state.last_proposal = None
         state.created_entities.append(CreatedEntity(type=entity_type, entity_id=entity_id))
         state.proposed_entities.append(
@@ -317,6 +336,16 @@ class DetectorSessionService:
             logger.info(
                 "[DetectorSession] Action changed %s → %s — re-emitting chip",
                 state.chip_shown_action, current_action,
+            )
+            return True
+        if (
+            current_action == "update"
+            and state.chip_shown_message_count is not None
+            and state.active.message_count > state.chip_shown_message_count
+        ):
+            logger.info(
+                "[DetectorSession] Update topic reinforced (msg %s → %s) — re-emitting chip",
+                state.chip_shown_message_count, state.active.message_count,
             )
             return True
         return False

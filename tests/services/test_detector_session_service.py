@@ -94,6 +94,44 @@ def test_chip_after_reinforcement_crosses_threshold(service: DetectorSessionServ
     assert proposal.show_chip is True
 
 
+def test_rechip_update_on_new_user_message(service: DetectorSessionService):
+    """Third message about same observation should offer update chip again."""
+    active = PendingCandidate(
+        id="obs-1",
+        type="observation",
+        title="Недосып влияет на продуктивность",
+        fields={"description": "Первое дополнение"},
+        confidence=1.0,
+        message_count=2,
+        action="update",
+        existing_entity_id="718f7636-3a75-4b96-831e-a9796b0d3482",
+    )
+    state = SessionState(
+        active=active,
+        chip_shown_for="obs-1",
+        chip_shown_action="update",
+        chip_shown_message_count=2,
+    )
+    detection = DetectorResult(
+        entities=[
+            DetectedEntity(
+                type="observation",
+                confidence=1.0,
+                title="Проблема со сном продолжается",
+                fields={"description": "Снова поздно", "valence": -0.6},
+                action="update",
+                existing_entity_id="718f7636-3a75-4b96-831e-a9796b0d3482",
+            )
+        ],
+        same_topic_as_pending=True,
+    )
+
+    _, proposal = service.process_detection(state, detection)
+
+    assert proposal is not None
+    assert proposal.action == "confirm_update"
+
+
 def test_does_not_rechip_same_id_without_revive(service: DetectorSessionService):
     active = PendingCandidate(
         id="p1",
@@ -230,6 +268,80 @@ def test_topic_switch_emits_chip_despite_same_topic_flag(service: DetectorSessio
     assert proposal.entity_type == "observation"
     assert new_state.active.type == "observation"
     assert len(new_state.shelved) == 1
+
+
+def test_observation_update_suppresses_rechip_on_same_pending(service: DetectorSessionService):
+    """Continuation about daily: update chip shown once, then suppressed (scenario D step 5)."""
+    active = PendingCandidate(
+        id="obs-daily-1",
+        type="observation",
+        title="Замешательство на daily из-за страха показаться глупым",
+        fields={"description": "Промолчал про блокер"},
+        confidence=1.0,
+        action="update",
+        existing_entity_id="a23834a1-8109-4613-91b6-45eb109c3cd6",
+        existing_title="Замешательство на daily из-за страха показаться глупым",
+    )
+    state = SessionState(
+        active=active,
+        chip_shown_for="obs-daily-1",
+        chip_shown_action="update",
+    )
+    detection = DetectorResult(
+        entities=[
+            DetectedEntity(
+                type="observation",
+                confidence=1.0,
+                title="Успех в выражении блокера на daily",
+                fields={"description": "Сказал фразу про блокер"},
+                action="update",
+                existing_entity_id="a23834a1-8109-4613-91b6-45eb109c3cd6",
+            )
+        ],
+        same_topic_as_pending=True,
+    )
+
+    new_state, proposal = service.process_detection(state, detection)
+
+    assert proposal is None
+    assert new_state.active.id == "obs-daily-1"
+    assert new_state.active.action == "update"
+    assert new_state.chip_shown_for == "obs-daily-1"
+
+
+def test_observation_update_rechip_after_decline(service: DetectorSessionService):
+    """After decline, same observation update topic should emit chip again (scenario D2)."""
+    active = PendingCandidate(
+        id="obs-daily-1",
+        type="observation",
+        title="Замешательство на daily",
+        fields={},
+        confidence=0.95,
+        action="update",
+        existing_entity_id="entry-1",
+    )
+    state = SessionState(active=active, chip_shown_for="obs-daily-1", chip_shown_action="update")
+
+    declined = service.decline(state, pending_id="obs-daily-1")
+    assert declined.chip_shown_for is None
+
+    detection = DetectorResult(
+        entities=[
+            DetectedEntity(
+                type="observation",
+                confidence=0.92,
+                title="Успех на daily",
+                action="update",
+                existing_entity_id="entry-1",
+            )
+        ],
+        same_topic_as_pending=True,
+    )
+    new_state, proposal = service.process_detection(declined, detection)
+
+    assert proposal is not None
+    assert proposal.action == "confirm_update"
+    assert proposal.entity_type == "observation"
 
 
 def test_skips_declined_titles(service: DetectorSessionService):

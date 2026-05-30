@@ -1,4 +1,4 @@
-# Локальный стек: Postgres + Neo4j + Redis + Chroma + AI-service.
+# Локальный стек: Postgres + Neo4j + Chroma + AI-service.
 # Запуск: docker compose --env-file .env.local -f docker-compose.dev.yml up -d
 # См. LOCAL_DEVELOPMENT.md
 # Секреты — в .env.local (не коммитить). Для подстановки ${POSTGRES_PASSWORD} нужен --env-file.
@@ -42,13 +42,6 @@ services:
     volumes:
       - delez_local_neo4j_data:/data
 
-  redis:
-    image: redis:7-alpine
-    container_name: delez_local_redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-
   chroma:
     image: chromadb/chroma:latest
     container_name: delez_local_chroma
@@ -79,8 +72,6 @@ services:
       CHROMA_SERVER_HOST: chroma
       CHROMA_SERVER_PORT: "8000"
       CHROMA_SERVER_SSL: "False"
-      REDIS_HOST: redis
-      REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
     volumes:

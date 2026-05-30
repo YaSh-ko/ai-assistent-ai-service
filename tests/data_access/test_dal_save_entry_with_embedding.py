@@ -9,13 +9,9 @@ from app.data_access.repositories.dal import DataAccessLayer
 
 def _make_dal(entry_repo, embedding_repo, entry_thread_repo):
     return DataAccessLayer(
-        session_repo=MagicMock(),
         chat_session_repo=MagicMock(),
         entry_repo=entry_repo,
         entry_thread_repo=entry_thread_repo,
-        goal_thread_repo=MagicMock(),
-        experiment_thread_repo=MagicMock(),
-        analysis_thread_repo=MagicMock(),
         embedding_repo=embedding_repo,
     )
 

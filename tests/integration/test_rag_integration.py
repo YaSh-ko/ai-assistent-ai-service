@@ -8,12 +8,8 @@ from app.services.embedding_service import EmbeddingService
 def rag_chain(db_pool, chroma_client):
     """Create RAGChain with mocked dependencies"""
     from unittest.mock import AsyncMock, MagicMock
-    from app.data_access.postgresql.session_repository import SessionRepository
     from app.data_access.postgresql.entry_repository import EntryRepository
     from app.data_access.postgresql.entry_thread_repository import EntryThreadRepository
-    from app.data_access.postgresql.goal_thread_repository import GoalThreadRepository
-    from app.data_access.postgresql.experiment_thread_repository import ExperimentThreadRepository
-    from app.data_access.postgresql.analysis_thread_repository import AnalysisThreadRepository
     from app.data_access.postgresql.chat_session_repository import ChatSessionRepository
     from app.data_access.repositories.embedding_repository import EmbeddingRepository
 
@@ -34,14 +30,10 @@ def rag_chain(db_pool, chroma_client):
     mock_provider.pool = pool
 
     dal = DataAccessLayer(
-        session_repo=SessionRepository(mock_provider),
         chat_session_repo=ChatSessionRepository(mock_provider),
         entry_repo=EntryRepository(mock_provider),
         entry_thread_repo=EntryThreadRepository(mock_provider),
-        goal_thread_repo=GoalThreadRepository(mock_provider),
-        experiment_thread_repo=ExperimentThreadRepository(mock_provider),
-        analysis_thread_repo=AnalysisThreadRepository(mock_provider),
-        embedding_repo=EmbeddingRepository(chroma_client)
+        embedding_repo=EmbeddingRepository(chroma_client),
     )
     
     embedding_service = MagicMock()
