@@ -72,18 +72,11 @@ def _user_message_relates_to_pg_entity(
         return True
     if len(combined) >= 4 and combined[:4] in user:
         return True
-    title_words = [
-        w.strip(_PUNCT)
-        for w in combined.split()
-        if len(w.strip(_PUNCT)) > 2
-    ]
     for w in user_tokens:
-        if len(w) >= 3 and w[:3] in combined:
+        if len(w) >= 4 and w in combined:
             return True
-        if len(w) >= 3:
-            for tw in title_words:
-                if len(tw) >= 3 and w[:2] == tw[:2] and w[:2] not in {"по", "на", "не", "ни", "от", "до", "из", "за", "при"}:
-                    return True
+        if len(w) >= 4 and w[:4] in combined:
+            return True
     return False
 
 
@@ -121,8 +114,22 @@ def apply_existing_entity_update(
         existing_title, last_user_text, existing_description=existing_description,
     )
     titles_align = _titles_similar(entity.title or "", existing_title)
+    titles_diverge = bool(entity.title and existing_title and not titles_align)
+    if titles_diverge and not relates:
+        logger.info(
+            "[DetectorService] Keeping create: new title %r unrelated to %r (score=%.3f)",
+            (entity.title or "")[:40],
+            existing_title[:40],
+            score,
+        )
+        return entity
+
     strong_match = score >= _UPDATE_STRONG_SCORE and (relates or titles_align)
-    moderate_match = score >= _UPDATE_SCORE_THRESHOLD and relates
+    moderate_match = (
+        score >= _UPDATE_SCORE_THRESHOLD
+        and relates
+        and (titles_align or not titles_diverge)
+    )
 
     if not (strong_match or moderate_match):
         logger.info(

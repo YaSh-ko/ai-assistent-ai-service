@@ -42,6 +42,28 @@ def test_keeps_create_when_score_too_low():
     assert result.action == "create"
 
 
+def test_keeps_create_spending_vs_sports_false_prefix():
+    """«заметил» must not match «занятий» via 2-letter prefix."""
+    entity = DetectedEntity(
+        type="observation",
+        confidence=0.83,
+        title="Много трачу",
+        action="create",
+    )
+    existing = [{
+        "entity_id": "07c69d46-76a5-4eea-9f36-9a5e79dead18",
+        "entity_type": "observation",
+        "title": "Усталость и прекращение занятий спортом",
+        "description": "Перестал ходить в зал",
+        "score": 0.820,
+    }]
+    result = apply_existing_entity_update(
+        entity, existing, "Еще заметил что много трачу",
+    )
+    assert result.action == "create"
+    assert result.title == "Много трачу"
+
+
 def test_keeps_create_for_unrelated_topic_without_continuation():
     entity = DetectedEntity(
         type="observation",

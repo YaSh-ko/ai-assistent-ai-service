@@ -172,13 +172,24 @@ class GraphRepository:
         """
         if not query_concepts:
             return []
-            
-        # Cypher query to find entries connected to concepts
+
+        # Текущая схема: Entry/Goal + RELATES_TO (узлов Concept в БД нет).
         query = """
-        MATCH (e:Entry {user_id: $user_id})-[r:HAS_CONCEPT|RELATES_TO]->(c:Concept)
-        WHERE c.name IN $concepts
-        WITH e, COUNT(DISTINCT c) as concept_matches, COLLECT(c.name) as matched_concepts
-        RETURN e, concept_matches, matched_concepts
+        MATCH (e:Entry {user_id: $user_id})
+        WITH e, $concepts AS concepts,
+             toLower(coalesce(e.title, '') + ' ' + coalesce(e.description, '')) AS text
+        WITH e,
+             [c IN concepts WHERE text CONTAINS c] AS matched
+        WHERE size(matched) > 0
+        RETURN e, size(matched) AS concept_matches, matched AS matched_concepts
+        UNION
+        MATCH (anchor:Entry {user_id: $user_id})
+        WITH anchor, $concepts AS concepts,
+             toLower(coalesce(anchor.title, '') + ' ' + coalesce(anchor.description, '')) AS text
+        WHERE any(c IN concepts WHERE text CONTAINS c)
+        MATCH (anchor)-[:RELATES_TO]-(e:Entry {user_id: $user_id})
+        WHERE e.id <> anchor.id
+        RETURN e, 1 AS concept_matches, [] AS matched_concepts
         ORDER BY concept_matches DESC
         LIMIT $limit
         """

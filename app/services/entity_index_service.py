@@ -27,22 +27,32 @@ SELECT id::text FROM public.experiments WHERE user_id = $1
 """
 
 _FETCH_ENTITIES_SQL = """
-(SELECT id::text, 'observation' AS entity_type, title, description, 'active' AS status
+(SELECT id::text, 'observation' AS entity_type, title, description, 'active' AS status, life_area
  FROM public.entries
  WHERE user_id = $1)
 
 UNION ALL
 
-(SELECT id::text, 'goal' AS entity_type, title, description, status
+(SELECT id::text, 'goal' AS entity_type, title, description, status, life_area
  FROM public.goals
  WHERE user_id = $1)
 
 UNION ALL
 
-(SELECT id::text, 'task' AS entity_type, title, description, status
+(SELECT id::text, 'task' AS entity_type, title, description, status, NULL::varchar AS life_area
  FROM public.experiments
  WHERE user_id = $1)
 """
+
+
+def _index_document(title: str, description: str, life_area: Optional[str]) -> str:
+    t = (title or "").strip()
+    if not t:
+        t = (description or "").strip()[:200]
+    area = (life_area or "").strip().lower()
+    if area:
+        return f"[{area}] {t}"[:500]
+    return t[:500]
 
 
 class EntityMatch:
@@ -56,6 +66,7 @@ class EntityMatch:
         description: str,
         status: str,
         score: float,
+        life_area: Optional[str] = None,
     ):
         self.entity_id = entity_id
         self.entity_type = entity_type
@@ -63,6 +74,7 @@ class EntityMatch:
         self.description = description
         self.status = status
         self.score = score
+        self.life_area = life_area
 
     def to_prompt_line(self) -> str:
         status_part = f" [{self.status}]" if self.status != "active" else ""
@@ -76,6 +88,7 @@ class EntityMatch:
             "description": self.description[:200] if self.description else "",
             "status": self.status,
             "score": round(self.score, 3),
+            "life_area": self.life_area,
         }
 
 
@@ -190,16 +203,26 @@ class EntityIndexService:
             return
 
         logger.info("[EntityIndex] Need to embed %d new entities", len(new_rows))
-        for r in new_rows[:5]:
-            logger.debug(
-                "[EntityIndex]   new: [%s] id=%s title=%r",
-                r["entity_type"], r["id"][:8], (r["title"] or "")[:60],
+        texts = []
+        for r in new_rows:
+            doc = _index_document(
+                r.get("title") or "",
+                r.get("description") or "",
+                r.get("life_area"),
             )
-
-        texts = [
-            f"{r['title'] or ''} {r['description'] or ''}".strip()
-            for r in new_rows
-        ]
+            texts.append(doc)
+        for i, (r, doc) in enumerate(zip(new_rows[:10], texts[:10]), start=1):
+            logger.info(
+                "[EntityIndex]   index #%d: [%s] id=%s area=%s title=%r doc=%r",
+                i,
+                r["entity_type"],
+                r["id"][:8],
+                r.get("life_area") or "-",
+                (r.get("title") or "")[:50],
+                doc[:80],
+            )
+        if len(new_rows) > 10:
+            logger.info("[EntityIndex]   ... and %d more entities", len(new_rows) - 10)
 
         try:
             logger.info("[EntityIndex] Calling embeddings provider for %d texts...", len(texts))
@@ -217,6 +240,7 @@ class EntityIndexService:
                 "entity_type": r["entity_type"],
                 "title": r["title"] or "",
                 "status": r["status"] or "active",
+                "life_area": (r.get("life_area") or "") or "",
             }
             for r in new_rows
         ]
@@ -236,6 +260,28 @@ class EntityIndexService:
             logger.error("[EntityIndex] ChromaDB upsert failed: %s", e, exc_info=True)
 
         self._indexed_users[user_id] = time.time()
+
+    async def force_reindex_user(self, user_id: str) -> int:
+        """Удалить индекс пользователя в Chroma и заново встроить все сущности (life_area, заголовки)."""
+        logger.info("[EntityIndex] === Force reindex start === user=%s", user_id)
+        self._indexed_users.pop(user_id, None)
+        try:
+            existing = self._collection.get(where={"user_id": user_id}, include=[])
+            ids = existing.get("ids") or []
+            if ids:
+                self._collection.delete(ids=ids)
+                logger.info("[EntityIndex] Cleared %d Chroma docs for user %s", len(ids), user_id)
+        except Exception as e:
+            logger.warning("[EntityIndex] Chroma clear failed for user %s: %s", user_id, e)
+
+        await self._ensure_indexed(user_id)
+        try:
+            after = self._collection.get(where={"user_id": user_id}, include=[])
+            count = len(after.get("ids") or [])
+        except Exception:
+            count = 0
+        logger.info("[EntityIndex] Force reindex done for user %s: %d entities", user_id, count)
+        return count
 
     async def search(
         self,
@@ -265,11 +311,12 @@ class EntityIndexService:
             )
             return await self._fallback_text_search(user_id, query_text, top_k)
 
+        n_results = max(top_k * 3, 15)
         try:
             results = self._collection.query(
                 query_embeddings=[query_embedding],
                 where={"user_id": user_id},
-                n_results=top_k * 2,
+                n_results=n_results,
                 include=["metadatas", "documents", "distances"],
             )
         except Exception as e:
@@ -284,28 +331,36 @@ class EntityIndexService:
             logger.info("[EntityIndex] No candidates found in ChromaDB")
             return matches
 
+        below_thr = 0
         for i, doc_id in enumerate(results["ids"][0]):
             distance = results["distances"][0][i] if results["distances"] else 1.0
             score = 1.0 - distance
             meta = results["metadatas"][0][i] if results["metadatas"] else {}
             title = meta.get("title", "")
+            life_area_raw = meta.get("life_area") or "-"
+            doc = results["documents"][0][i] if results["documents"] else ""
 
             passed = score >= threshold
+            if not passed:
+                below_thr += 1
             logger.info(
-                "[EntityIndex]   candidate #%d: [%s] id=%s title=%r score=%.3f (distance=%.3f) %s",
+                "[EntityIndex]   candidate #%d: [%s] id=%s area=%s title=%r "
+                "score=%.3f dist=%.3f doc=%r %s",
                 i + 1,
                 meta.get("entity_type", "?"),
                 doc_id[:12],
+                life_area_raw,
                 title[:50],
                 score,
                 distance,
+                (doc or "")[:70],
                 "PASS" if passed else "BELOW_THRESHOLD",
             )
 
             if not passed:
                 continue
 
-            doc = results["documents"][0][i] if results["documents"] else ""
+            life_area = meta.get("life_area") or None
             matches.append(
                 EntityMatch(
                     entity_id=doc_id,
@@ -314,19 +369,30 @@ class EntityIndexService:
                     description=doc,
                     status=meta.get("status", "active"),
                     score=score,
+                    life_area=life_area if life_area else None,
                 )
             )
 
         matches.sort(key=lambda m: m.score, reverse=True)
         final = matches[:top_k]
         logger.info(
-            "[EntityIndex] === Search result === %d matches above threshold (from %d raw)",
-            len(final), raw_count,
+            "[EntityIndex] === Search result === %d matches (raw=%d below_thr=%d) "
+            "threshold=%.2f top_k=%d",
+            len(final),
+            raw_count,
+            below_thr,
+            threshold,
+            top_k,
         )
         for m in final:
             logger.info(
-                "[EntityIndex]   MATCH: [%s] id=%s title=%r score=%.3f status=%s",
-                m.entity_type, m.entity_id[:12], m.title[:50], m.score, m.status,
+                "[EntityIndex]   MATCH: [%s] id=%s area=%s title=%r score=%.3f status=%s",
+                m.entity_type,
+                m.entity_id[:12],
+                m.life_area or "-",
+                m.title[:50],
+                m.score,
+                m.status,
             )
         return final
 
